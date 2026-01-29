@@ -1,10 +1,10 @@
 package com.fourverr.api.controller;
 
-import com.fourverr.api.model.Ilustracion;
 import com.fourverr.api.model.Pedido;
+import com.fourverr.api.model.Producto;
 import com.fourverr.api.model.Usuario;
-import com.fourverr.api.repository.IlustracionRepository;
 import com.fourverr.api.repository.PedidoRepository;
+import com.fourverr.api.repository.ProductoRepository;
 import com.fourverr.api.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +16,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/pedidos")
+@CrossOrigin(origins = "http://localhost:5173")
 public class PedidoController {
 
     @Autowired
@@ -25,48 +26,42 @@ public class PedidoController {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
-    private IlustracionRepository ilustracionRepository;
+    private ProductoRepository productoRepository;
 
-    // POST: Crear un nuevo pedido (Comprar)
     @PostMapping
     public ResponseEntity<?> crearPedido(@RequestBody Map<String, Object> datos) {
-        // Obtenemos los IDs del JSON
-        String nombreCliente = (String) datos.get("nombreCliente");
-        Long idIlustracion = Long.valueOf(datos.get("idIlustracion").toString());
-        String requisitos = (String) datos.get("requisitos");
+        try {
+            String nombreCliente = (String) datos.get("nombreCliente");
+            // Ahora recibimos idProducto
+            Long idProducto = Long.valueOf(datos.get("idProducto").toString());
+            String requisitos = (String) datos.get("requisitos");
 
-        // 1. Validar Cliente
-        Optional<Usuario> clienteOpt = usuarioRepository.findByNombreUsuario(nombreCliente);
-        if (clienteOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body("El cliente no existe");
+            Optional<Usuario> clienteOpt = usuarioRepository.findByNombreUsuario(nombreCliente);
+            if (clienteOpt.isEmpty()) return ResponseEntity.badRequest().body("Cliente no existe");
+
+            Optional<Producto> productoOpt = productoRepository.findById(idProducto);
+            if (productoOpt.isEmpty()) return ResponseEntity.badRequest().body("Producto no existe");
+
+            Pedido pedido = new Pedido();
+            pedido.setCliente(clienteOpt.get());
+            pedido.setProducto(productoOpt.get());
+            pedido.setRequisitosCliente(requisitos);
+            pedido.setEstado("PENDIENTE");
+
+            return ResponseEntity.ok(pedidoRepository.save(pedido));
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
-
-        // 2. Validar Ilustración
-        Optional<Ilustracion> ilustracionOpt = ilustracionRepository.findById(idIlustracion);
-        if (ilustracionOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body("La ilustración no existe");
-        }
-
-        // 3. Crear el Pedido
-        Pedido pedido = new Pedido();
-        pedido.setCliente(clienteOpt.get());
-        pedido.setIlustracion(ilustracionOpt.get());
-        pedido.setRequisitosCliente(requisitos);
-        pedido.setEstado("PENDIENTE"); // Estado inicial por defecto
-
-        Pedido pedidoGuardado = pedidoRepository.save(pedido);
-        return ResponseEntity.ok(pedidoGuardado);
     }
 
-    // GET: Ver mis compras (como Cliente)
     @GetMapping("/mis-compras/{nombreUsuario}")
     public List<Pedido> verMisCompras(@PathVariable String nombreUsuario) {
         return pedidoRepository.findByCliente_NombreUsuario(nombreUsuario);
     }
 
-    // GET: Ver mis ventas (como Ilustrador)
-    @GetMapping("/mis-ventas/{nombreIlustrador}")
-    public List<Pedido> verMisVentas(@PathVariable String nombreIlustrador) {
-        return pedidoRepository.findByIlustracion_Ilustrador_NombreUsuario(nombreIlustrador);
+    @GetMapping("/mis-ventas/{nombreVendedor}")
+    public List<Pedido> verMisVentas(@PathVariable String nombreVendedor) {
+        return pedidoRepository.findByProducto_Vendedor_NombreUsuario(nombreVendedor);
     }
 }

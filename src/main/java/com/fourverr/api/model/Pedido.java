@@ -13,22 +13,21 @@ public class Pedido {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Relación: Un pedido pertenece a UN Cliente
     @ManyToOne
     @JoinColumn(name = "cliente_id", nullable = false)
     private Usuario cliente;
 
-    // Relación: Un pedido es de UNA Ilustración
+    // CAMBIO IMPORTANTE: Ahora apunta a Producto
     @ManyToOne
-    @JoinColumn(name = "ilustracion_id", nullable = false)
-    private Ilustracion ilustracion;
+    @JoinColumn(name = "producto_id", nullable = false)
+    private Producto producto;
 
     @Column(nullable = false)
-    private String estado; // Valores: "PENDIENTE", "EN_PROCESO", "ENTREGADO"
+    private String estado; 
 
     @Column(name = "fecha_pedido")
     private LocalDateTime fechaPedido = LocalDateTime.now();
 
     @Column(columnDefinition = "TEXT")
-    private String requisitosCliente; // Ejemplo: "Quiero que el personaje tenga ojos rojos"
+    private String requisitosCliente;
 }
