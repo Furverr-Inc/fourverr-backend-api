@@ -41,7 +41,7 @@ public class ProductoController {
             @RequestParam("titulo") String titulo,
             @RequestParam("descripcion") String descripcion,
             @RequestParam("precio") BigDecimal precio,
-            @RequestParam("tipo") String tipoStr, // "CURSO_DIGITAL", "SERVICIO_GIG"
+            @RequestParam("tipo") String tipoStr,
             @RequestParam("nombreUsuario") String nombreUsuario) {
 
         Optional<Usuario> vendedorOpt = usuarioRepository.findByNombreUsuario(nombreUsuario);
@@ -59,13 +59,30 @@ public class ProductoController {
             prod.setPrecio(precio);
             prod.setUrlArchivo(urlArchivo);
             prod.setUrlPortada(urlPortada);
-            prod.setTipo(TipoProducto.valueOf(tipoStr)); // Convierte texto a Enum
+            prod.setTipo(TipoProducto.valueOf(tipoStr));
             prod.setVendedor(vendedorOpt.get());
 
             return ResponseEntity.ok(productoRepository.save(prod));
-
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
+    }
+
+    // Nuevo método para manejar la petición DELETE desde React
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminarProducto(@PathVariable Long id) {
+        return productoRepository.findById(id).map(producto -> {
+            try {
+                // Primero limpiamos Amazon S3
+                if (producto.getUrlArchivo() != null) {
+                    s3Service.eliminarImagen(producto.getUrlArchivo());
+                }
+                // Luego limpiamos la base de datos MySQL
+                productoRepository.delete(producto);
+                return ResponseEntity.ok().build();
+            } catch (Exception e) {
+                return ResponseEntity.internalServerError().body("Fallo al borrar: " + e.getMessage());
+            }
+        }).orElse(ResponseEntity.notFound().build());
     }
 }
