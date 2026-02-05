@@ -1,6 +1,7 @@
 package com.fourverr.api.repository;
 
 import com.fourverr.api.model.Producto;
+import com.fourverr.api.model.TipoProducto;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
@@ -8,9 +9,9 @@ import java.util.List;
 @Repository
 public interface ProductoRepository extends JpaRepository<Producto, Long> {
     
-    // Buscar todos los productos de un vendedor específico
-    List<Producto> findByVendedor_NombreUsuario(String nombreUsuario);
+    // CAMBIO: findByVendedor_Username (Inglés y Entidad User)
+    List<Producto> findByVendedor_Username(String username);
     
-    // Buscar por tipo (Ej: "Dame todos los cursos")
-    List<Producto> findByTipo(String tipo);
+    // Búsqueda por Tipo
+    List<Producto> findByTipo(TipoProducto tipo);
 }

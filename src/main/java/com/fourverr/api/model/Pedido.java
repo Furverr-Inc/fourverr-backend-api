@@ -13,17 +13,17 @@ public class Pedido {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // CAMBIO: Ahora apunta a 'User'
     @ManyToOne
     @JoinColumn(name = "cliente_id", nullable = false)
-    private Usuario cliente;
+    private User cliente; 
 
-    // CAMBIO IMPORTANTE: Ahora apunta a Producto
     @ManyToOne
     @JoinColumn(name = "producto_id", nullable = false)
     private Producto producto;
 
     @Column(nullable = false)
-    private String estado; 
+    private String estado; // PENDIENTE, PAGADO, etc.
 
     @Column(name = "fecha_pedido")
     private LocalDateTime fechaPedido = LocalDateTime.now();

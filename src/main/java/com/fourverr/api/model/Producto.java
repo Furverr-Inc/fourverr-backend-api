@@ -23,24 +23,26 @@ public class Producto {
     @Column(nullable = false)
     private BigDecimal precio;
 
-    // Aquí va el link del archivo que vendes (video, pdf, imagen final)
     @Column(name = "url_archivo", nullable = false)
     private String urlArchivo;
 
-    // La imagen de portada para mostrar en la tienda
     @Column(name = "url_portada")
     private String urlPortada;
 
-    // Define si es Curso, Gig, etc.
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TipoProducto tipo;
 
-    @Column(name = "fecha_creacion")
-    private LocalDateTime fechaCreacion = LocalDateTime.now();
+    @Column(name = "fecha_creacion", updatable = false)
+    private LocalDateTime fechaCreacion;
 
-    // Quién lo vende
-    @ManyToOne
-    @JoinColumn(name = "vendedor_id", referencedColumnName = "nombre_usuario")
-    private Usuario vendedor;
+    // CAMBIO: Ahora apunta a 'User' (Vendedor)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "seller_id", nullable = false)
+    private User vendedor;
+
+    @PrePersist
+    protected void onCreate() {
+        this.fechaCreacion = LocalDateTime.now();
+    }
 }
