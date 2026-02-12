@@ -19,26 +19,37 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "*") // Permite que React entre sin problemas de CORS
 public class AuthController {
 
-    @Autowired private AuthenticationManager authenticationManager;
-    @Autowired private UserRepository userRepository;
-    @Autowired private PasswordEncoder passwordEncoder;
-    @Autowired private JwtUtil jwtUtil;
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        // Verificar si el usuario ya existe (por username)
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body("El usuario ya existe");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("El nombre de usuario ya existe");
         }
+        
+        // Verificar si el correo ya existe (Validación extra recomendada)
+        // if (userRepository.existsByEmail(request.getEmail())) { ... }
 
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setEmail(request.getEmail());
         user.setNombreMostrado(request.getNombreMostrado());
-        user.setRole(Role.USER); // Por defecto todos son USER
+        user.setRole(Role.USER); // Por defecto todos son USER al registrarse
 
         userRepository.save(user);
         return ResponseEntity.ok("Usuario registrado exitosamente");
@@ -46,26 +57,29 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
-        // 1. Autenticar credenciales
+        
+        // 1. Autenticar credenciales con Spring Security
+        // (Aquí Spring usa tu CustomUserDetailsService para checar user O email)
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword()));
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // 2. Obtener el usuario completo de la BD (Necesario para el JwtUtil nuevo)
-        User user = userRepository.findByUsername(loginRequest.getUsername())
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        // 2. Obtener el usuario completo de la BD (LA CORRECCIÓN ESTÁ AQUÍ 🚨)
+        // Antes usabas findByUsername, y si ponías correo fallaba.
+        // Ahora usamos findByUsernameOrEmail para que lo encuentre sea cual sea.
+        User user = userRepository.findByUsernameOrEmail(loginRequest.getUsername(), loginRequest.getUsername())
+                .orElseThrow(() -> new RuntimeException("Error crítico: Usuario no encontrado después de autenticar."));
 
-        // 3. Generar token pasando el OBJETO user
+        // 3. Generar el token JWT usando los datos reales del usuario
         String jwt = jwtUtil.generateToken(user);
 
+        // 4. Devolver respuesta al Frontend
         return ResponseEntity.ok(new JwtResponse(
                 jwt,
-                user.getUsername(),
+                user.getUsername(),     // Devuelve el usuario real (ej. "diego123") aunque haya entrado con correo
                 user.getId(),
                 user.getRole().toString()
         ));
-
-
     }
 }
