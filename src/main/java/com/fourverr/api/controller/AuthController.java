@@ -65,5 +65,7 @@ public class AuthController {
                 user.getId(),
                 user.getRole().toString()
         ));
+
+
     }
 }
