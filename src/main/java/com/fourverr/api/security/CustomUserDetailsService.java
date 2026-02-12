@@ -10,14 +10,21 @@ import java.util.Collections;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
-    @Autowired private UserRepository userRepository;
+
+    @Autowired 
+    private UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    public UserDetails loadUserByUsername(String usernameOrEmail) throws UsernameNotFoundException {
+        // 🔥 AQUI ESTA EL CAMBIO:
+        // Pasamos la variable 'usernameOrEmail' DOS VECES.
+        // Significa: "Búscalo en la columna username... y si no está, búscalo en la columna email"
+        User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("Usuario o correo no encontrado: " + usernameOrEmail));
+
         return new org.springframework.security.core.userdetails.User(
-                user.getUsername(), user.getPassword(),
+                user.getUsername(), // Usamos el username real de la BD para la sesión
+                user.getPassword(),
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
     }
 }
