@@ -1,7 +1,7 @@
 package com.fourverr.api.model;
 
 import jakarta.persistence.*;
-import lombok.Data; // Si usas Lombok, si no, genera Getters/Setters manuales
+import lombok.Data;
 
 @Entity
 @Table(name = "users")
@@ -23,11 +23,12 @@ public class User {
     private String email;
 
     @Enumerated(EnumType.STRING)
-    private Role role; // ADMIN, USER, SELLER
+    private Role role;
 
-    // NUEVO CAMPO PARA EL SISTEMA DE APROBACIÓN
     @Column(name = "solicitud_vendedor")
     private boolean solicitudVendedor = false;
     
-    // OJO: Si no usas Lombok, genera aquí abajo los Getters y Setters de 'solicitudVendedor'
+    // CAMPO PARA EL PERFIL (SIN FOTO)
+    @Column(name = "descripcion", length = 1000)
+    private String descripcion;
 }

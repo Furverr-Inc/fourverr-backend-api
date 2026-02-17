@@ -8,7 +8,10 @@ import com.fourverr.api.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
@@ -16,6 +19,7 @@ public class UserController {
 
     @Autowired private UserRepository userRepository;
     @Autowired private JwtUtil jwtUtil;
+    @Autowired private BCryptPasswordEncoder passwordEncoder;
 
     // EL USUARIO PIDE SER VENDEDOR
     @PostMapping("/solicitar-vendedor")
@@ -54,7 +58,6 @@ public class UserController {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // CORRECCIÓN: Pasamos el objeto 'user', no strings sueltos
         String nuevoToken = jwtUtil.generateToken(user);
 
         return ResponseEntity.ok(new JwtResponse(
@@ -63,5 +66,65 @@ public class UserController {
                 user.getId(), 
                 user.getRole().toString()
         ));
+    }
+
+    // ========== ENDPOINTS DE PERFIL (SIN FOTO) ==========
+
+    // OBTENER PERFIL DEL USUARIO ACTUAL
+    @GetMapping("/perfil")
+    public ResponseEntity<?> obtenerPerfil() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        
+        return ResponseEntity.ok(Map.of(
+            "id", user.getId(),
+            "username", user.getUsername(),
+            "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
+            "email", user.getEmail(),
+            "role", user.getRole().toString(),
+            "descripcion", user.getDescripcion() != null ? user.getDescripcion() : ""
+        ));
+    }
+
+    // ACTUALIZAR PERFIL (nombre, descripción, email)
+    @PutMapping("/perfil")
+    public ResponseEntity<?> actualizarPerfil(@RequestBody Map<String, String> datos) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (datos.containsKey("nombreMostrado")) {
+            user.setNombreMostrado(datos.get("nombreMostrado"));
+        }
+        if (datos.containsKey("email")) {
+            user.setEmail(datos.get("email"));
+        }
+        if (datos.containsKey("descripcion")) {
+            user.setDescripcion(datos.get("descripcion"));
+        }
+
+        userRepository.save(user);
+        return ResponseEntity.ok("Perfil actualizado correctamente");
+    }
+
+    // CAMBIAR CONTRASEÑA
+    @PutMapping("/perfil/password")
+    public ResponseEntity<?> cambiarPassword(@RequestBody Map<String, String> datos) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        String passwordActual = datos.get("passwordActual");
+        String passwordNueva = datos.get("passwordNueva");
+
+        if (!passwordEncoder.matches(passwordActual, user.getPassword())) {
+            return ResponseEntity.badRequest().body("La contraseña actual es incorrecta");
+        }
+
+        user.setPassword(passwordEncoder.encode(passwordNueva));
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Contraseña actualizada correctamente");
     }
 }
