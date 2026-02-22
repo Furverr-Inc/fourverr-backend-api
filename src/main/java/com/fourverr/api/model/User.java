@@ -31,4 +31,8 @@ public class User {
     // CAMPO PARA EL PERFIL (SIN FOTO)
     @Column(name = "descripcion", length = 1000)
     private String descripcion;
+
+    // url s3 para la foto de perfil:
+    @Column(name = "foto_url")
+    private String fotoUrl;
 }

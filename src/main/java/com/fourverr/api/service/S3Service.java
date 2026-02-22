@@ -8,8 +8,8 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.DeleteObjectRequest; // Importante para borrar
+import software.amazon.awssdk.services.s3.model.PutObjectRequest; // sube
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest; // borra
 
 import java.io.IOException;
 import java.util.UUID;
@@ -32,23 +32,36 @@ public class S3Service {
                 .build();
     }
 
-    public String subirImagen(MultipartFile archivo) {
-        try {
-            String fileName = UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
-            PutObjectRequest request = PutObjectRequest.builder()
-                    .bucket(bucketName)
-                    .key(fileName)
-                    .contentType(archivo.getContentType())
-                    .build();
-
-            s3Client.putObject(request, RequestBody.fromInputStream(archivo.getInputStream(), archivo.getSize()));
-            return "https://" + bucketName + ".s3.amazonaws.com/" + fileName;
-        } catch (IOException e) {
-            throw new RuntimeException("Error al leer el archivo: " + e.getMessage());
-        }
+    // metodo IMAGEN PERFIL ---USUSARIO---
+    public String subirImagenPerfil(MultipartFile archivo, String username) {
+        String fileName = "perfiles/" + username + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
+        return enviarAS3(archivo, fileName);
     }
 
-    // Nuevo método para borrar de Amazon S3
+    // metodo PRODUCTOS ---VENDEDOR---
+    public String subirImagenProducto(MultipartFile archivo, String username) {
+        // Estructura: productos/nombreVendedor/uuid_nombre.jpg
+        String fileName = "productos/" + username + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
+        return enviarAS3(archivo, fileName);
+    }
+
+    // Subida general
+    private String enviarAS3(MultipartFile archivo, String fileName) {
+        try {
+            PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(fileName)
+                .contentType(archivo.getContentType())
+                .build();
+
+        s3Client.putObject(request, RequestBody.fromInputStream(archivo.getInputStream(), archivo.getSize()));
+        return "https://" + bucketName + ".s3.amazonaws.com/" + fileName;
+    } catch (IOException e) {
+        throw new RuntimeException("Error al procesar archivo en S3: " + e.getMessage());
+    }
+}
+
+    // metodo para borrar de Amazon S3
     public void eliminarImagen(String urlImagen) {
         try {
             // Extrae el nombre del archivo de la URL pública

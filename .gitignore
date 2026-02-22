@@ -8,3 +8,4 @@ target/
 
 # SEGURIDAD: Ignoramos el archivo con las claves reales
 src/main/resources/application.properties
+

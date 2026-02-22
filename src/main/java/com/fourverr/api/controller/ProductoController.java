@@ -30,6 +30,7 @@ public class ProductoController {
         return productoRepository.findAll();
     }
 
+    // metodo para publicar un producto (solo vendedores)
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<?> publicarProducto(
             @RequestParam("archivo") MultipartFile archivo,
@@ -51,22 +52,25 @@ public class ProductoController {
         }
 
         try {
-            String urlArchivo = s3Service.subirImagen(archivo);
-            String urlPortada = (portada != null) ? s3Service.subirImagen(portada) : null;
+        // subida de productos a S3
+        String urlArchivo = s3Service.subirImagenProducto(archivo, username);
+        
+        // Si hay portada, also la subimos a la carpeta de productos
+        String urlPortada = (portada != null) ? s3Service.subirImagenProducto(portada, username) : null;
 
-            Producto prod = new Producto();
-            prod.setTitulo(titulo);
-            prod.setDescripcion(descripcion);
-            prod.setPrecio(precio);
-            prod.setUrlArchivo(urlArchivo);
-            prod.setUrlPortada(urlPortada);
-            prod.setTipo(TipoProducto.valueOf(tipoStr));
-            prod.setVendedor(vendedor);
+        Producto prod = new Producto();
+        prod.setTitulo(titulo);
+        prod.setDescripcion(descripcion);
+        prod.setPrecio(precio);
+        prod.setUrlArchivo(urlArchivo);
+        prod.setUrlPortada(urlPortada);
+        prod.setTipo(TipoProducto.valueOf(tipoStr));
+        prod.setVendedor(vendedor);
 
-            return ResponseEntity.ok(productoRepository.save(prod));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
-        }
+        return ResponseEntity.ok(productoRepository.save(prod));
+    } catch (Exception e) {
+        return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+}
     }
     
     // Método para eliminar
