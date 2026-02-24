@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*") // Permite que React entre sin problemas de CORS
+
 public class AuthController {
 
     @Autowired

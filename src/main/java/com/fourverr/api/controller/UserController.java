@@ -15,6 +15,8 @@ import org.springframework.web.multipart.MultipartFile; // s3
 
 
 import java.util.Map;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -161,5 +163,114 @@ public class UserController {
         userRepository.save(user);
 
         return ResponseEntity.ok("Contraseña actualizada correctamente");
+    }
+
+    // ========== ENDPOINTS DE ADMINISTRADOR ==========
+
+    // OBTENER SOLICITUDES PENDIENTES DE VENDEDOR
+    @GetMapping("/solicitudes-vendedor")
+    public ResponseEntity<?> obtenerSolicitudesVendedor() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        List<User> solicitudes = userRepository.findAll().stream()
+                .filter(u -> u.isSolicitudVendedor() && u.getRole() == Role.USER)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(solicitudes.stream().map(user -> Map.of(
+            "id", user.getId(),
+            "username", user.getUsername(),
+            "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
+            "email", user.getEmail()
+        )).collect(Collectors.toList()));
+    }
+
+    // OBTENER LISTA DE VENDEDORES
+    @GetMapping("/vendedores")
+    public ResponseEntity<?> obtenerVendedores() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        List<User> vendedores = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == Role.SELLER)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(vendedores.stream().map(user -> Map.of(
+            "id", user.getId(),
+            "username", user.getUsername(),
+            "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
+            "email", user.getEmail(),
+            "descripcion", user.getDescripcion() != null ? user.getDescripcion() : "",
+            "habilitado", user.isHabilitado()
+        )).collect(Collectors.toList()));
+    }
+
+    // RECHAZAR SOLICITUD DE VENDEDOR
+    @PutMapping("/{id}/rechazar-vendedor")
+    public ResponseEntity<?> rechazarVendedor(@PathVariable Long id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        user.setSolicitudVendedor(false);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Solicitud rechazada");
+    }
+
+    // HABILITAR/DESHABILITAR USUARIO
+    @PutMapping("/{id}/toggle-habilitado")
+    public ResponseEntity<?> toggleHabilitado(@PathVariable Long id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        user.setHabilitado(!user.isHabilitado());
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Usuario " + (user.isHabilitado() ? "habilitado" : "deshabilitado"));
+    }
+
+    // ELIMINAR USUARIO
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminarUsuario(@PathVariable Long id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        userRepository.delete(user);
+
+        return ResponseEntity.ok("Usuario eliminado correctamente");
     }
 }

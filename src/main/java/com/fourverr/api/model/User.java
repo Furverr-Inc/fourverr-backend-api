@@ -35,4 +35,8 @@ public class User {
     // url s3 para la foto de perfil:
     @Column(name = "foto_url")
     private String fotoUrl;
+    
+    // Campo para habilitar/deshabilitar usuario
+    @Column(name = "habilitado")
+    private boolean habilitado = true;
 }
