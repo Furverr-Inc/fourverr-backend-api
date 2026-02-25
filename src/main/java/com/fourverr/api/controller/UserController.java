@@ -215,6 +215,33 @@ public class UserController {
         )).collect(Collectors.toList()));
     }
 
+    // OBTENER TODOS LOS USUARIOS (ADMIN)
+    @GetMapping("/todos")
+    public ResponseEntity<?> obtenerTodosLosUsuarios() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        List<User> usuarios = userRepository.findAll().stream()
+                .filter(u -> u.getRole() != Role.ADMIN) // Excluir otros admins
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(usuarios.stream().map(user -> Map.of(
+            "id", user.getId(),
+            "username", user.getUsername(),
+            "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
+            "email", user.getEmail(),
+            "role", user.getRole().toString(),
+            "descripcion", user.getDescripcion() != null ? user.getDescripcion() : "",
+            "habilitado", user.isHabilitado(),
+            "fotoUrl", user.getFotoUrl() != null ? user.getFotoUrl() : ""
+        )).collect(Collectors.toList()));
+    }
+
     // RECHAZAR SOLICITUD DE VENDEDOR
     @PutMapping("/{id}/rechazar-vendedor")
     public ResponseEntity<?> rechazarVendedor(@PathVariable Long id) {
