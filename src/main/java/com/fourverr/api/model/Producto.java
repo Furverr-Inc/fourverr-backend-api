@@ -1,5 +1,6 @@
 package com.fourverr.api.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -36,9 +37,10 @@ public class Producto {
     @Column(name = "fecha_creacion", updatable = false)
     private LocalDateTime fechaCreacion;
 
-    // CAMBIO: Ahora apunta a 'User' (Vendedor)
-    @ManyToOne(fetch = FetchType.LAZY)
+    // Apunta al vendedor - EAGER para que siempre se cargue con el producto
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "seller_id", nullable = false)
+    @JsonIgnoreProperties({"password", "solicitudVendedor", "habilitado", "descripcion"})
     private User vendedor;
 
     @PrePersist
