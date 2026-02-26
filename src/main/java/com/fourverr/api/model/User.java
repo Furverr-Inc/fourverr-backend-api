@@ -26,7 +26,7 @@ public class User {
     private Role role;
 
     @Column(name = "solicitud_vendedor")
-    private boolean solicitudVendedor = false;
+    private Boolean solicitudVendedor = false;
     
     // CAMPO PARA EL PERFIL (SIN FOTO)
     @Column(name = "descripcion", length = 1000)
@@ -38,5 +38,14 @@ public class User {
     
     // Campo para habilitar/deshabilitar usuario
     @Column(name = "habilitado")
-    private boolean habilitado = true;
+    private Boolean habilitado = true;
+
+    // Métodos seguros contra null (usuarios viejos en BD pueden tener NULL)
+    public boolean isHabilitado() {
+        return habilitado != null ? habilitado : true;
+    }
+
+    public boolean isSolicitudVendedor() {
+        return solicitudVendedor != null ? solicitudVendedor : false;
+    }
 }

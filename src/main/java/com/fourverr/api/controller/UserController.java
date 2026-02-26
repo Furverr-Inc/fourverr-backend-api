@@ -47,6 +47,14 @@ public class UserController {
     // EL ADMIN APRUEBA (Endpoint protegido)
     @PutMapping("/{id}/aprobar-vendedor")
     public ResponseEntity<?> aprobarVendedor(@PathVariable Long id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
@@ -120,7 +128,8 @@ public class UserController {
             "email", user.getEmail(),
             "role", user.getRole().toString(),
             "descripcion", user.getDescripcion() != null ? user.getDescripcion() : "",
-            "fotoUrl", user.getFotoUrl() != null ? user.getFotoUrl() : "" // pal s3
+            "fotoUrl", user.getFotoUrl() != null ? user.getFotoUrl() : "", // pal s3
+            "solicitudVendedor", user.isSolicitudVendedor()
         ));
     }
 
@@ -167,15 +176,59 @@ public class UserController {
 
     // ========== ENDPOINTS DE ADMINISTRADOR ==========
 
+    // DIAGNÓSTICO: Ver qué rol tiene el usuario actual en la BD
+    @GetMapping("/debug/mi-rol")
+    public ResponseEntity<?> verMiRol() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        return ResponseEntity.ok(Map.of(
+            "username", user.getUsername(),
+            "role", user.getRole().toString(),
+            "id", user.getId(),
+            "habilitado", user.isHabilitado()
+        ));
+    }
+
+    // SETUP: Promover usuario a ADMIN (solo funciona si aún no hay ningún ADMIN en la BD)
+    @PutMapping("/setup/hacer-admin/{id}")
+    public ResponseEntity<?> hacerAdmin(@PathVariable Long id) {
+        // Solo permite esto si NO existe ningún ADMIN todavía
+        boolean yaHayAdmin = userRepository.findAll().stream()
+                .anyMatch(u -> u.getRole() == Role.ADMIN);
+
+        if (yaHayAdmin) {
+            return ResponseEntity.status(403).body("Ya existe un administrador. Este endpoint está bloqueado.");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        user.setRole(Role.ADMIN);
+        userRepository.save(user);
+
+        return ResponseEntity.ok(Map.of(
+            "mensaje", "✅ Usuario " + user.getUsername() + " ahora es ADMIN",
+            "username", user.getUsername(),
+            "role", user.getRole().toString()
+        ));
+    }
+
     // OBTENER SOLICITUDES PENDIENTES DE VENDEDOR
     @GetMapping("/solicitudes-vendedor")
     public ResponseEntity<?> obtenerSolicitudesVendedor() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        System.out.println("=== /solicitudes-vendedor llamado por: '" + username + "' ===");
+        
         User admin = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + username));
+
+        System.out.println("=== Role en BD para '" + username + "': " + admin.getRole() + " ===");
 
         if (admin.getRole() != Role.ADMIN) {
-            return ResponseEntity.status(403).body("No tienes permisos");
+            System.out.println("=== ACCESO DENEGADO: role=" + admin.getRole() + " (esperado ADMIN) ===");
+            return ResponseEntity.status(403).body("No tienes permisos. Tu rol es: " + admin.getRole());
         }
 
         List<User> solicitudes = userRepository.findAll().stream()
@@ -219,11 +272,16 @@ public class UserController {
     @GetMapping("/todos")
     public ResponseEntity<?> obtenerTodosLosUsuarios() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        System.out.println("=== /todos llamado por: '" + username + "' ===");
+
         User admin = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + username));
+
+        System.out.println("=== Role en BD para '" + username + "': " + admin.getRole() + " ===");
 
         if (admin.getRole() != Role.ADMIN) {
-            return ResponseEntity.status(403).body("No tienes permisos");
+            System.out.println("=== ACCESO DENEGADO: role=" + admin.getRole() + " ===");
+            return ResponseEntity.status(403).body("No tienes permisos. Tu rol actual en BD es: " + admin.getRole());
         }
 
         List<User> usuarios = userRepository.findAll().stream()
@@ -280,6 +338,46 @@ public class UserController {
         userRepository.save(user);
 
         return ResponseEntity.ok("Usuario " + (user.isHabilitado() ? "habilitado" : "deshabilitado"));
+    }
+
+    // HABILITAR USUARIO (específico)
+    @PutMapping("/{id}/habilitar")
+    public ResponseEntity<?> habilitarUsuario(@PathVariable Long id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        user.setHabilitado(true);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Usuario habilitado");
+    }
+
+    // DESHABILITAR USUARIO (específico)
+    @PutMapping("/{id}/deshabilitar")
+    public ResponseEntity<?> deshabilitarUsuario(@PathVariable Long id) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User admin = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (admin.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("No tienes permisos");
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        user.setHabilitado(false);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Usuario deshabilitado");
     }
 
     // ELIMINAR USUARIO

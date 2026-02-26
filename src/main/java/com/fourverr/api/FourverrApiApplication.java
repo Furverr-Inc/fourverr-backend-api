@@ -8,6 +8,6 @@ public class FourverrApiApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(FourverrApiApplication.class, args);
-        System.out.println("🚀 ¡FOURVERR API (JAVA 17) HA INICIADO CON ÉXITO! 🚀");
+        System.out.println("¡FOURVERR API HA INICIADO CON ÉXITO!");
     }
 }
