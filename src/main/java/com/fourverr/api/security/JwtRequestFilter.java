@@ -61,6 +61,21 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             }
         }
 
+
+        System.out.println("Path solicitado: " + path);
+        System.out.println("Header Authorization: " + (authHeader != null ? "Presente" : "AUSENTE"));
+
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+            try {
+                username = jwtUtil.extractUsername(jwt);
+                System.out.println("Usuario extraído del Token: " + username);
+                } 
+            catch (Exception e) {
+                System.out.println("Error al extraer username: " + e.getMessage());
+                }
+        }
+
         // Validar token solo si hay username
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
