@@ -65,21 +65,26 @@ public class AuthController {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // 2. Obtener el usuario completo de la BD (LA CORRECCIÓN ESTÁ AQUÍ 🚨)
-        // Antes usabas findByUsername, y si ponías correo fallaba.
-        // Ahora usamos findByUsernameOrEmail para que lo encuentre sea cual sea.
+        // 2. Obtener el usuario completo de la BD
         User user = userRepository.findByUsernameOrEmail(loginRequest.getUsername(), loginRequest.getUsername())
                 .orElseThrow(() -> new RuntimeException("Error crítico: Usuario no encontrado después de autenticar."));
 
-        // 3. Generar el token JWT usando los datos reales del usuario
+        // 3. Verificar si el usuario está habilitado
+        if (!user.isHabilitado()) {
+            return ResponseEntity.status(403).body("Tu cuenta ha sido deshabilitada. Contacta al administrador.");
+        }
+
+        // 4. Generar el token JWT usando los datos reales del usuario
         String jwt = jwtUtil.generateToken(user);
 
-        // 4. Devolver respuesta al Frontend
+        // 5. Devolver respuesta al Frontend (con foto y nombre para la Navbar)
         return ResponseEntity.ok(new JwtResponse(
                 jwt,
-                user.getUsername(),     // Devuelve el usuario real (ej. "diego123") aunque haya entrado con correo
+                user.getUsername(),
                 user.getId(),
-                user.getRole().toString()
+                user.getRole().toString(),
+                user.getNombreMostrado() != null ? user.getNombreMostrado() : user.getUsername(),
+                user.getFotoUrl() != null ? user.getFotoUrl() : ""
         ));
     }
 }
