@@ -34,16 +34,31 @@ public class S3Service {
 
     // metodo IMAGEN PERFIL ---USUSARIO---
     public String subirImagenPerfil(MultipartFile archivo, String username) {
-        String fileName = "perfiles/" + username + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
+        String usernameLimpio = username.replaceAll("\\s+", "_");
+    
+        String fileName = "perfiles/" + usernameLimpio + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
         return enviarAS3(archivo, fileName);
     }
 
     // metodo PRODUCTOS ---VENDEDOR---
     public String subirImagenProducto(MultipartFile archivo, String username) {
-        // Estructura: productos/nombreVendedor/uuid_nombre.jpg
-        String fileName = "productos/" + username + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
-        return enviarAS3(archivo, fileName);
+        String usernameLimpio = username.replaceAll("\\s+", "_");
+    try {
+        String fileName = "productos/" + usernameLimpio + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
+        
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucketName)
+                .key(fileName)
+                .contentType(archivo.getContentType())
+                .build();
+
+        s3Client.putObject(request, RequestBody.fromInputStream(archivo.getInputStream(), archivo.getSize()));
+    
+        return "https://" + bucketName + ".s3.amazonaws.com/" + fileName;
+    } catch (IOException e) {
+        throw new RuntimeException("Error al procesar el archivo para S3: " + e.getMessage());
     }
+}
 
     // Subida general
     private String enviarAS3(MultipartFile archivo, String fileName) {
