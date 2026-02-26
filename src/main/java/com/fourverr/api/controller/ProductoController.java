@@ -30,6 +30,26 @@ public class ProductoController {
         return productoRepository.findAll();
     }
 
+    // Obtener solo los productos del vendedor autenticado
+    @GetMapping("/mis-publicaciones")
+    public ResponseEntity<?> misPublicaciones() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        String username = auth.getName();
+
+        User vendedor = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        if (vendedor.getRole() != Role.SELLER && vendedor.getRole() != Role.ADMIN) {
+            return ResponseEntity.status(403).body("Solo los vendedores pueden ver sus publicaciones");
+        }
+
+        List<Producto> productos = productoRepository.findAll().stream()
+                .filter(p -> p.getVendedor() != null && p.getVendedor().getId().equals(vendedor.getId()))
+                .collect(java.util.stream.Collectors.toList());
+
+        return ResponseEntity.ok(productos);
+    }
+
     // metodo para publicar un producto (solo vendedores)
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<?> publicarProducto(
