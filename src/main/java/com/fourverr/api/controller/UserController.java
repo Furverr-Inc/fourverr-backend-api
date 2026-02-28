@@ -4,6 +4,7 @@ import com.fourverr.api.dto.JwtResponse;
 import com.fourverr.api.model.Role;
 import com.fourverr.api.model.User;
 import com.fourverr.api.repository.UserRepository;
+import com.fourverr.api.repository.ProductoRepository;
 import com.fourverr.api.security.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +24,7 @@ import java.util.stream.Collectors;
 public class UserController {
 
     @Autowired private UserRepository userRepository;
+    @Autowired private ProductoRepository productoRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private BCryptPasswordEncoder passwordEncoder;
     @Autowired private S3Service s3Service; // s3
@@ -393,6 +395,12 @@ public class UserController {
 
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
+        // Eliminar primero los productos del usuario para evitar error de FK
+        List<com.fourverr.api.model.Producto> productos = productoRepository.findByVendedor_Id(id);
+        if (!productos.isEmpty()) {
+            productoRepository.deleteAll(productos);
+        }
 
         userRepository.delete(user);
 
