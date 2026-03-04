@@ -11,9 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import com.fourverr.api.service.S3Service; // s3
-import org.springframework.web.multipart.MultipartFile; // s3
-
+import com.fourverr.api.service.S3Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 import java.util.List;
@@ -27,7 +26,7 @@ public class UserController {
     @Autowired private ProductoRepository productoRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private BCryptPasswordEncoder passwordEncoder;
-    @Autowired private S3Service s3Service; // s3
+    @Autowired private S3Service s3Service;
 
     // EL USUARIO PIDE SER VENDEDOR
     @PostMapping("/solicitar-vendedor")
@@ -46,7 +45,7 @@ public class UserController {
         return ResponseEntity.ok("Solicitud enviada. Esperando aprobación del Admin.");
     }
 
-    // EL ADMIN APRUEBA (Endpoint protegido)
+    // EL ADMIN APRUEBA
     @PutMapping("/{id}/aprobar-vendedor")
     public ResponseEntity<?> aprobarVendedor(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -67,7 +66,7 @@ public class UserController {
         return ResponseEntity.ok("Usuario " + user.getUsername() + " ahora es VENDEDOR.");
     }
 
-    // REFRESCAR EL TOKEN SIN SALIRSE
+    // REFRESCAR TOKEN SIN SALIRSE
     @GetMapping("/refresh-status")
     public ResponseEntity<?> refrescarEstado() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -77,44 +76,39 @@ public class UserController {
         String nuevoToken = jwtUtil.generateToken(user);
 
         return ResponseEntity.ok(new JwtResponse(
-                nuevoToken, 
-                user.getUsername(), 
-                user.getId(), 
+                nuevoToken,
+                user.getUsername(),
+                user.getId(),
                 user.getRole().toString()
         ));
     }
 
-    // OBTENER PEREFIL DE IMAGEN DE PERFIL
+    // ACTUALIZAR FOTO DE PERFIL
     @PostMapping("/perfil/foto")
     public ResponseEntity<?> actualizarFoto(@RequestParam("archivo") MultipartFile archivo) {
-        // 1. Validar formato (solo jpg/png)
         String contentType = archivo.getContentType();
         if (contentType == null || (!contentType.equals("image/jpeg") && !contentType.equals("image/png"))) {
             return ResponseEntity.badRequest().body("Solo se permiten archivos JPG o PNG");
         }
 
         try {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+            String username = SecurityContextHolder.getContext().getAuthentication().getName();
+            User user = userRepository.findByUsername(username)
+                    .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Borrar foto anterior si existe
-        if (user.getFotoUrl() != null && !user.getFotoUrl().isEmpty()) {
-            s3Service.eliminarImagen(user.getFotoUrl());
+            if (user.getFotoUrl() != null && !user.getFotoUrl().isEmpty()) {
+                s3Service.eliminarImagen(user.getFotoUrl());
+            }
+
+            String nuevaUrl = s3Service.subirImagenPerfil(archivo, username);
+            user.setFotoUrl(nuevaUrl);
+            userRepository.save(user);
+
+            return ResponseEntity.ok(Map.of("url", nuevaUrl));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
-
-        // LLAMADA ACTUALIZADA: Pasamos el username para que cree la carpeta
-        String nuevaUrl = s3Service.subirImagenPerfil(archivo, username);
-
-        user.setFotoUrl(nuevaUrl);
-        userRepository.save(user);
-
-        return ResponseEntity.ok(Map.of("url", nuevaUrl));
-    } catch (Exception e) {
-        return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
     }
-    }
-
 
     // OBTENER PERFIL DEL USUARIO ACTUAL
     @GetMapping("/perfil")
@@ -122,16 +116,17 @@ public class UserController {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-        
+
         return ResponseEntity.ok(Map.of(
-            "id", user.getId(),
-            "username", user.getUsername(),
-            "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
-            "email", user.getEmail(),
-            "role", user.getRole().toString(),
-            "descripcion", user.getDescripcion() != null ? user.getDescripcion() : "",
-            "fotoUrl", user.getFotoUrl() != null ? user.getFotoUrl() : "", // pal s3
-            "solicitudVendedor", user.isSolicitudVendedor()
+            "id",                user.getId(),
+            "username",          user.getUsername(),
+            "nombreMostrado",    user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
+            "email",             user.getEmail(),
+            "role",              user.getRole().toString(),
+            "descripcion",       user.getDescripcion() != null ? user.getDescripcion() : "",
+            "fotoUrl",           user.getFotoUrl() != null ? user.getFotoUrl() : "",
+            "solicitudVendedor", user.isSolicitudVendedor(),
+            "saldoDisponible",   user.getSaldoDisponible()  // ← único campo nuevo
         ));
     }
 
@@ -178,7 +173,6 @@ public class UserController {
 
     // ========== ENDPOINTS DE ADMINISTRADOR ==========
 
-    // DIAGNÓSTICO: Ver qué rol tiene el usuario actual en la BD
     @GetMapping("/debug/mi-rol")
     public ResponseEntity<?> verMiRol() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -186,17 +180,15 @@ public class UserController {
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
         return ResponseEntity.ok(Map.of(
-            "username", user.getUsername(),
-            "role", user.getRole().toString(),
-            "id", user.getId(),
+            "username",  user.getUsername(),
+            "role",      user.getRole().toString(),
+            "id",        user.getId(),
             "habilitado", user.isHabilitado()
         ));
     }
 
-    // SETUP: Promover usuario a ADMIN (solo funciona si aún no hay ningún ADMIN en la BD)
     @PutMapping("/setup/hacer-admin/{id}")
     public ResponseEntity<?> hacerAdmin(@PathVariable Long id) {
-        // Solo permite esto si NO existe ningún ADMIN todavía
         boolean yaHayAdmin = userRepository.findAll().stream()
                 .anyMatch(u -> u.getRole() == Role.ADMIN);
 
@@ -211,25 +203,19 @@ public class UserController {
         userRepository.save(user);
 
         return ResponseEntity.ok(Map.of(
-            "mensaje", "✅ Usuario " + user.getUsername() + " ahora es ADMIN",
+            "mensaje",  "✅ Usuario " + user.getUsername() + " ahora es ADMIN",
             "username", user.getUsername(),
-            "role", user.getRole().toString()
+            "role",     user.getRole().toString()
         ));
     }
 
-    // OBTENER SOLICITUDES PENDIENTES DE VENDEDOR
     @GetMapping("/solicitudes-vendedor")
     public ResponseEntity<?> obtenerSolicitudesVendedor() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        System.out.println("=== /solicitudes-vendedor llamado por: '" + username + "' ===");
-        
         User admin = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + username));
 
-        System.out.println("=== Role en BD para '" + username + "': " + admin.getRole() + " ===");
-
         if (admin.getRole() != Role.ADMIN) {
-            System.out.println("=== ACCESO DENEGADO: role=" + admin.getRole() + " (esperado ADMIN) ===");
             return ResponseEntity.status(403).body("No tienes permisos. Tu rol es: " + admin.getRole());
         }
 
@@ -238,14 +224,13 @@ public class UserController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(solicitudes.stream().map(user -> Map.of(
-            "id", user.getId(),
-            "username", user.getUsername(),
+            "id",             user.getId(),
+            "username",       user.getUsername(),
             "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
-            "email", user.getEmail()
+            "email",          user.getEmail()
         )).collect(Collectors.toList()));
     }
 
-    // OBTENER LISTA DE VENDEDORES
     @GetMapping("/vendedores")
     public ResponseEntity<?> obtenerVendedores() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -261,48 +246,42 @@ public class UserController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(vendedores.stream().map(user -> Map.of(
-            "id", user.getId(),
-            "username", user.getUsername(),
+            "id",             user.getId(),
+            "username",       user.getUsername(),
             "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
-            "email", user.getEmail(),
-            "descripcion", user.getDescripcion() != null ? user.getDescripcion() : "",
-            "habilitado", user.isHabilitado()
+            "email",          user.getEmail(),
+            "descripcion",    user.getDescripcion() != null ? user.getDescripcion() : "",
+            "habilitado",     user.isHabilitado(),
+            "saldoDisponible", user.getSaldoDisponible()  // ← útil para el admin ver ganancias
         )).collect(Collectors.toList()));
     }
 
-    // OBTENER TODOS LOS USUARIOS (ADMIN)
     @GetMapping("/todos")
     public ResponseEntity<?> obtenerTodosLosUsuarios() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        System.out.println("=== /todos llamado por: '" + username + "' ===");
-
         User admin = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + username));
 
-        System.out.println("=== Role en BD para '" + username + "': " + admin.getRole() + " ===");
-
         if (admin.getRole() != Role.ADMIN) {
-            System.out.println("=== ACCESO DENEGADO: role=" + admin.getRole() + " ===");
             return ResponseEntity.status(403).body("No tienes permisos. Tu rol actual en BD es: " + admin.getRole());
         }
 
         List<User> usuarios = userRepository.findAll().stream()
-                .filter(u -> u.getRole() != Role.ADMIN) // Excluir otros admins
+                .filter(u -> u.getRole() != Role.ADMIN)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(usuarios.stream().map(user -> Map.of(
-            "id", user.getId(),
-            "username", user.getUsername(),
+            "id",             user.getId(),
+            "username",       user.getUsername(),
             "nombreMostrado", user.getNombreMostrado() != null ? user.getNombreMostrado() : "",
-            "email", user.getEmail(),
-            "role", user.getRole().toString(),
-            "descripcion", user.getDescripcion() != null ? user.getDescripcion() : "",
-            "habilitado", user.isHabilitado(),
-            "fotoUrl", user.getFotoUrl() != null ? user.getFotoUrl() : ""
+            "email",          user.getEmail(),
+            "role",           user.getRole().toString(),
+            "descripcion",    user.getDescripcion() != null ? user.getDescripcion() : "",
+            "habilitado",     user.isHabilitado(),
+            "fotoUrl",        user.getFotoUrl() != null ? user.getFotoUrl() : ""
         )).collect(Collectors.toList()));
     }
 
-    // RECHAZAR SOLICITUD DE VENDEDOR
     @PutMapping("/{id}/rechazar-vendedor")
     public ResponseEntity<?> rechazarVendedor(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -322,7 +301,6 @@ public class UserController {
         return ResponseEntity.ok("Solicitud rechazada");
     }
 
-    // HABILITAR/DESHABILITAR USUARIO
     @PutMapping("/{id}/toggle-habilitado")
     public ResponseEntity<?> toggleHabilitado(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -342,7 +320,6 @@ public class UserController {
         return ResponseEntity.ok("Usuario " + (user.isHabilitado() ? "habilitado" : "deshabilitado"));
     }
 
-    // HABILITAR USUARIO (específico)
     @PutMapping("/{id}/habilitar")
     public ResponseEntity<?> habilitarUsuario(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -362,7 +339,6 @@ public class UserController {
         return ResponseEntity.ok("Usuario habilitado");
     }
 
-    // DESHABILITAR USUARIO (específico)
     @PutMapping("/{id}/deshabilitar")
     public ResponseEntity<?> deshabilitarUsuario(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -382,7 +358,6 @@ public class UserController {
         return ResponseEntity.ok("Usuario deshabilitado");
     }
 
-    // ELIMINAR USUARIO
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarUsuario(@PathVariable Long id) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -396,14 +371,12 @@ public class UserController {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Eliminar primero los productos del usuario para evitar error de FK
         List<com.fourverr.api.model.Producto> productos = productoRepository.findByVendedor_Id(id);
         if (!productos.isEmpty()) {
             productoRepository.deleteAll(productos);
         }
 
         userRepository.delete(user);
-
         return ResponseEntity.ok("Usuario eliminado correctamente");
     }
 }

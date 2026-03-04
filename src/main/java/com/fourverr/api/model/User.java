@@ -1,5 +1,7 @@
 package com.fourverr.api.model;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -27,6 +29,12 @@ public class User {
 
     @Column(name = "solicitud_vendedor")
     private Boolean solicitudVendedor = false;
+
+    @Column(name = "saldo_disponible", precision = 10, scale = 2)
+private BigDecimal saldoDisponible = BigDecimal.ZERO;
+
+public BigDecimal getSaldoDisponible() { return saldoDisponible != null ? saldoDisponible : BigDecimal.ZERO; }
+public void setSaldoDisponible(BigDecimal saldo) { this.saldoDisponible = saldo; }
     
     // CAMPO PARA EL PERFIL (SIN FOTO)
     @Column(name = "descripcion", length = 1000)

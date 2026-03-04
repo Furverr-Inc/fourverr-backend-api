@@ -11,9 +11,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/pedidos")
@@ -28,21 +29,46 @@ public class PedidoController {
     public ResponseEntity<?> crearPedido(@RequestBody Map<String, Object> datos) {
         try {
             Long idProducto = Long.valueOf(datos.get("idProducto").toString());
-            String requisitos = (String) datos.get("requisitos");
+            String requisitos = datos.containsKey("requisitos")
+                    ? (String) datos.get("requisitos") : null;
+            String stripePaymentIntentId = datos.containsKey("stripePaymentIntentId")
+                    ? datos.get("stripePaymentIntentId").toString() : null;
 
-            // SEGURIDAD: Obtenemos el cliente del Token
+            // Cliente sacado del token JWT, nunca del body
             String usernameActual = SecurityContextHolder.getContext().getAuthentication().getName();
             User cliente = userRepository.findByUsername(usernameActual)
                     .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
 
-            Optional<Producto> productoOpt = productoRepository.findById(idProducto);
-            if (productoOpt.isEmpty()) return ResponseEntity.badRequest().body("Producto no existe");
+            Producto producto = productoRepository.findById(idProducto)
+                    .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+
+            // Comisión: 10% para Fourverr, 90% para el vendedor
+            // Cambia el "0.10" cuando quieras ajustar tu comisión
+            BigDecimal comision = new BigDecimal("0.10");
+            BigDecimal montoVendedor = producto.getPrecio()
+                    .multiply(BigDecimal.ONE.subtract(comision))
+                    .setScale(2, RoundingMode.HALF_UP);
 
             Pedido pedido = new Pedido();
             pedido.setCliente(cliente);
-            pedido.setProducto(productoOpt.get());
+            pedido.setProducto(producto);
             pedido.setRequisitosCliente(requisitos);
-            pedido.setEstado("PENDIENTE");
+            pedido.setMontoVendedor(montoVendedor);
+            pedido.setStripePaymentIntentId(stripePaymentIntentId);
+
+            // Solo sumamos saldo si el pago de Stripe ya fue confirmado
+            if (stripePaymentIntentId != null) {
+                pedido.setEstado("PAGADO");
+
+                User vendedor = producto.getVendedor();
+                vendedor.setSaldoDisponible(
+                    vendedor.getSaldoDisponible().add(montoVendedor)
+                );
+                userRepository.save(vendedor);
+
+            } else {
+                pedido.setEstado("PENDIENTE");
+            }
 
             return ResponseEntity.ok(pedidoRepository.save(pedido));
 
@@ -55,5 +81,12 @@ public class PedidoController {
     public List<Pedido> verMisCompras() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return pedidoRepository.findByCliente_Username(username);
+    }
+
+    @GetMapping("/mis-ventas")
+    public ResponseEntity<?> verMisVentas() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        List<Pedido> ventas = pedidoRepository.findByProducto_Vendedor_Username(username);
+        return ResponseEntity.ok(ventas);
     }
 }
