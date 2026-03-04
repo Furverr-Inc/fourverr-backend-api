@@ -19,12 +19,15 @@ public class S3Service {
 
     private final S3Client s3Client;
     private final String bucketName;
+    private final String cloudFrontDomain;
 
     public S3Service(@Value("${aws.s3.bucket}") String bucketName,
                      @Value("${aws.s3.region}") String region,
                      @Value("${aws.access.key.id}") String accessKey,
-                     @Value("${aws.secret.access.key}") String secretKey) {
+                     @Value("${aws.secret.access.key}") String secretKey,
+                     @Value("${aws.cloudfront.domain}") String cloudFrontDomain) {
         this.bucketName = bucketName;
+        this.cloudFrontDomain = cloudFrontDomain;
         AwsBasicCredentials creds = AwsBasicCredentials.create(accessKey, secretKey);
         this.s3Client = S3Client.builder()
                 .region(Region.of(region))
@@ -55,7 +58,7 @@ public class S3Service {
                 .build();
 
         s3Client.putObject(request, RequestBody.fromInputStream(archivo.getInputStream(), archivo.getSize()));
-        return "https://" + bucketName + ".s3.amazonaws.com/" + fileName;
+        return "https://" + cloudFrontDomain + "/" + fileName;
     } catch (IOException e) {
         throw new RuntimeException("Error al procesar archivo en S3: " + e.getMessage());
     }
