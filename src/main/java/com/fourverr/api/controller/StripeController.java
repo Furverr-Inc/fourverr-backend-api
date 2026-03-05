@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 @RestController
@@ -22,26 +23,28 @@ public class StripeController {
     public ResponseEntity<?> crearPaymentIntent(@RequestBody Map<String, Object> datos) {
         try {
             Long idProducto = Long.valueOf(datos.get("idProducto").toString());
-            String currency = datos.getOrDefault("currency", "mxn").toString();
+            String currency  = datos.getOrDefault("currency", "mxn").toString();
+            // ===== NUEVO: cantidad (default 1) =====
+            int cantidad = datos.containsKey("cantidad")
+                    ? Integer.parseInt(datos.get("cantidad").toString()) : 1;
+            if (cantidad < 1) cantidad = 1;
 
-            // Buscamos el producto para obtener su precio real desde la BD
-            // (nunca confíes en el precio que manda el frontend, puede manipularse)
             Producto producto = productoRepository.findById(idProducto)
                     .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
 
-            PaymentIntent intent = stripeService.crearPaymentIntent(
-                producto.getPrecio(), currency
-            );
+            // Precio total = precio unitario × cantidad
+            BigDecimal precioTotal = producto.getPrecio().multiply(BigDecimal.valueOf(cantidad));
+
+            PaymentIntent intent = stripeService.crearPaymentIntent(precioTotal, currency);
 
             return ResponseEntity.ok(Map.of(
-                "clientSecret", intent.getClientSecret(),
+                "clientSecret",    intent.getClientSecret(),
                 "paymentIntentId", intent.getId(),
-                "monto", producto.getPrecio()
+                "monto",           precioTotal
             ));
 
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
-                .body(Map.of("error", e.getMessage()));
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 }

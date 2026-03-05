@@ -32,13 +32,13 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        // 🔥 NO FILTRAR LOGIN NI REGISTRO
+        // NO FILTRAR LOGIN NI REGISTRO
         if (path.startsWith("/api/auth")) {
             chain.doFilter(request, response);
             return;
         }
 
-        // 🔥 DEJAR PASAR OPTIONS (CORS PREFLIGHT)
+        // DEJAR PASAR OPTIONS (CORS PREFLIGHT)
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
             chain.doFilter(request, response);
             return;

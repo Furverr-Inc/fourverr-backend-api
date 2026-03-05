@@ -42,12 +42,14 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
             .authorizeHttpRequests(auth -> auth
+                // Rutas públicas
                 .requestMatchers("/api/auth/**").permitAll()
-                // 👇 AQUÍ HACEMOS PÚBLICOS LOS PRODUCTOS 👇
-                .requestMatchers("/api/productos/**", "/api/productos").permitAll() 
+                .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()
+                // Todas las demás rutas autenticadas — sin restricción de roles
                 .anyRequest().authenticated()
             )
 
+            // DESACTIVAR el chequeo de cuenta habilitada en el provider
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -57,10 +59,10 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173")); 
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true); 
+        configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -77,6 +79,9 @@ public class SecurityConfig {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
+        // Desactiva el chequeo de isEnabled() en el provider
+        // para que el control de habilitado lo maneje solo el login
+        provider.setPreAuthenticationChecks(userDetails -> {});
         return provider;
     }
 

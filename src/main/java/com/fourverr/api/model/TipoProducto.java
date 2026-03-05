@@ -1,21 +1,14 @@
 package com.fourverr.api.model;
 
 public enum TipoProducto {
-    SERVICIO_GIG,       // Una ilustración personalizada ✅
-    CURSO_DIGITAL,      // Un video o curso    (3D)      ✅
-    RECURSO_DESCARGABLE,// Un PDF, un Zip, Assets        ✅
-    SUSCRIPCION         // ilustracion                   ✅
+    SERVICIO_GIG,
+    CURSO_DIGITAL,
+    RECURSO_DESCARGABLE,
+    SUSCRIPCION,
+    PRODUCTO_FISICO,
+    CONSULTORIA,
+    DISENO_GRAFICO,
+    DESARROLLO_WEB,
+    MARKETING_DIGITAL,
+    MUSICA_AUDIO
 }
-
-// roubd robin. LEast connections algoritmo de balanceo de carga.
-//microservicio para la gestion de prodcutos CRUD
-/*  
-ilustracion
-modelo 3d
-paquete de assets   
-seervicio tecnico   serviicio_gig
-
-se tiene que crear un producto personalizado
-usando un hasmap para poder aglomerarlos
-
-*/
