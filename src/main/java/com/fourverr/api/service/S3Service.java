@@ -68,9 +68,18 @@ public class S3Service {
     public void eliminarImagen(String urlImagen) {
         try {
             // Extrae el key completo de la URL (ej: productos/usuario/uuid_file.jpg)
-            String prefix = "https://" + bucketName + ".s3.amazonaws.com/";
-            String key = urlImagen.startsWith(prefix) ? urlImagen.substring(prefix.length()) : urlImagen.substring(urlImagen.lastIndexOf("/") + 1);
-            
+            String cfPrefix = "https://" + cloudFrontDomain + "/";
+            String s3Prefix = "https://" + bucketName + ".s3.amazonaws.com/";
+
+            String key;
+                if (urlImagen.startsWith(cfPrefix)) {
+                    key = urlImagen.substring(cfPrefix.length());          
+                } else if (urlImagen.startsWith(s3Prefix)) {
+                    key = urlImagen.substring(s3Prefix.length());           
+                } else {
+                    throw new RuntimeException("URL de imagen no reconocida: " + urlImagen);
+                }
+
             DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
                     .bucket(bucketName)
                     .key(key)

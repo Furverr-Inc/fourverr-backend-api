@@ -43,7 +43,7 @@ public class ProductoController {
             try { return productoRepository.findByTipo(TipoProducto.valueOf(tipo)); }
             catch (IllegalArgumentException e) { return productoRepository.findAll(); }
         }
-        return productoRepository.findAll();
+        return productoRepository.findByActivoTrue();
     }
 
     @GetMapping("/mis-publicaciones")
@@ -91,14 +91,10 @@ public class ProductoController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarProducto(@PathVariable Long id) {
-        return productoRepository.findById(id).map(producto -> {
-            try {
-                if (producto.getUrlArchivo() != null) s3Service.eliminarImagen(producto.getUrlArchivo());
-                productoRepository.delete(producto);
-                return ResponseEntity.ok().build();
-            } catch (Exception e) {
-                return ResponseEntity.internalServerError().body("Error al borrar: " + e.getMessage());
-            }
-        }).orElse(ResponseEntity.notFound().build());
+    return productoRepository.findById(id).map(producto -> {
+        producto.setActivo(false);
+        productoRepository.save(producto);
+        return ResponseEntity.ok().build();
+        }).orElse(ResponseEntity.notFound().build());   
     }
 }
