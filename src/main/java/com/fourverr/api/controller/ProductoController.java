@@ -16,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -37,14 +38,14 @@ public class ProductoController {
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String tipo) {
 
-        boolean tieneQ    = q    != null && !q.isBlank();
+        boolean tieneQ = q != null && !q.isBlank();
         boolean tieneTipo = tipo != null && !tipo.isBlank();
 
         if (tieneQ && tieneTipo) {
             try { return productoRepository.buscarPorTextoYTipo(q, TipoProducto.valueOf(tipo)); }
             catch (IllegalArgumentException e) { return productoRepository.buscarPorTexto(q); }
         }
-        if (tieneQ)    return productoRepository.buscarPorTexto(q);
+        if (tieneQ) return productoRepository.buscarPorTexto(q);
         if (tieneTipo) {
             try { return productoRepository.findByTipo(TipoProducto.valueOf(tipo)); }
             catch (IllegalArgumentException e) { return productoRepository.findAll(); }
@@ -57,24 +58,28 @@ public class ProductoController {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         User vendedor = userRepository.findByUsername(auth.getName())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
         if (vendedor.getRole() != Role.SELLER && vendedor.getRole() != Role.ADMIN)
             return ResponseEntity.status(403).body("Solo los vendedores pueden ver sus publicaciones");
+
         return ResponseEntity.ok(productoRepository.findByVendedor_Username(auth.getName()));
     }
 
     // ── CREAR ──
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<?> publicarProducto(
-            @RequestParam("archivo")                    MultipartFile archivo,
+            @RequestParam("archivo") MultipartFile archivo,
             @RequestParam(value = "portada", required = false) MultipartFile portada,
-            @RequestParam("titulo")      String titulo,
+            @RequestParam("titulo") String titulo,
             @RequestParam("descripcion") String descripcion,
-            @RequestParam("precio")      BigDecimal precio,
-            @RequestParam("tipo")        String tipoStr) {
+            @RequestParam("precio") BigDecimal precio,
+            @RequestParam("tipo") String tipoStr) {
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+
         User vendedor = userRepository.findByUsername(auth.getName())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+
         if (vendedor.getRole() != Role.SELLER && vendedor.getRole() != Role.ADMIN)
             return ResponseEntity.status(403).body("Debes ser Vendedor para publicar");
 
@@ -90,7 +95,9 @@ public class ProductoController {
             prod.setUrlPortada(urlPortada);
             prod.setTipo(TipoProducto.valueOf(tipoStr));
             prod.setVendedor(vendedor);
+
             return ResponseEntity.ok(productoRepository.save(prod));
+
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
         }
@@ -100,10 +107,10 @@ public class ProductoController {
     @PutMapping(value = "/{id}", consumes = {"multipart/form-data"})
     public ResponseEntity<?> editarProducto(
             @PathVariable Long id,
-            @RequestParam("titulo")      String titulo,
+            @RequestParam("titulo") String titulo,
             @RequestParam("descripcion") String descripcion,
-            @RequestParam("precio")      BigDecimal precio,
-            @RequestParam("tipo")        String tipoStr,
+            @RequestParam("precio") BigDecimal precio,
+            @RequestParam("tipo") String tipoStr,
             @RequestParam(value = "archivo", required = false) MultipartFile archivo,
             @RequestParam(value = "portada", required = false) MultipartFile portada) {
 
@@ -111,54 +118,67 @@ public class ProductoController {
         String username = auth.getName();
 
         return productoRepository.findById(id).map(prod -> {
-            // Solo el dueño o admin puede editar
+
             if (!prod.getVendedor().getUsername().equals(username)) {
                 User req = userRepository.findByUsername(username).orElse(null);
                 if (req == null || req.getRole() != Role.ADMIN)
                     return ResponseEntity.status(403).body("No tienes permiso para editar esta publicación");
             }
+
             try {
+
                 prod.setTitulo(titulo);
                 prod.setDescripcion(descripcion);
                 prod.setPrecio(precio);
                 prod.setTipo(TipoProducto.valueOf(tipoStr));
 
-                // Reemplazar archivo principal si se mandó uno nuevo
                 if (archivo != null && !archivo.isEmpty()) {
                     s3Service.eliminarImagen(prod.getUrlArchivo());
                     prod.setUrlArchivo(s3Service.subirImagenProducto(archivo, username));
                 }
-                // Reemplazar portada si se mandó una nueva
+
                 if (portada != null && !portada.isEmpty()) {
-                    if (prod.getUrlPortada() != null) s3Service.eliminarImagen(prod.getUrlPortada());
+                    if (prod.getUrlPortada() != null)
+                        s3Service.eliminarImagen(prod.getUrlPortada());
+
                     prod.setUrlPortada(s3Service.subirImagenProducto(portada, username));
                 }
 
                 return ResponseEntity.ok(productoRepository.save(prod));
+
             } catch (Exception e) {
                 return ResponseEntity.internalServerError().body("Error al editar: " + e.getMessage());
             }
+
         }).orElse(ResponseEntity.notFound().build());
     }
 
     // ── ELIMINAR ──
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminarProducto(@PathVariable Long id) {
+
         return productoRepository.findById(id).map(producto -> {
+
             try {
-                // 1. Borrar dependencias FK primero
+
                 favoritoRepository.deleteByProducto_Id(id);
                 preguntaRepository.deleteByProducto_Id(id);
                 pedidoRepository.deleteByProducto_Id(id);
-                // 2. Borrar imágenes de S3 (no cancela si falla)
-                if (producto.getUrlArchivo() != null) s3Service.eliminarImagen(producto.getUrlArchivo());
-                if (producto.getUrlPortada()  != null) s3Service.eliminarImagen(producto.getUrlPortada());
-                // 3. Borrar producto
+
+                if (producto.getUrlArchivo() != null)
+                    s3Service.eliminarImagen(producto.getUrlArchivo());
+
+                if (producto.getUrlPortada() != null)
+                    s3Service.eliminarImagen(producto.getUrlPortada());
+
                 productoRepository.delete(producto);
+
                 return ResponseEntity.ok().build();
+
             } catch (Exception e) {
                 return ResponseEntity.internalServerError().body("Error al borrar: " + e.getMessage());
             }
+
         }).orElse(ResponseEntity.notFound().build());
     }
 }
