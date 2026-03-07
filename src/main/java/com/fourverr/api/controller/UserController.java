@@ -3,15 +3,18 @@ package com.fourverr.api.controller;
 import com.fourverr.api.dto.JwtResponse;
 import com.fourverr.api.model.Role;
 import com.fourverr.api.model.User;
-import com.fourverr.api.repository.UserRepository;
+import com.fourverr.api.repository.FavoritoRepository;
+import com.fourverr.api.repository.PedidoRepository;
+import com.fourverr.api.repository.PreguntaRepository;
 import com.fourverr.api.repository.ProductoRepository;
+import com.fourverr.api.repository.UserRepository;
 import com.fourverr.api.security.JwtUtil;
+import com.fourverr.api.service.S3Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
-import com.fourverr.api.service.S3Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
@@ -23,6 +26,9 @@ public class UserController {
 
     @Autowired private UserRepository userRepository;
     @Autowired private ProductoRepository productoRepository;
+    @Autowired private FavoritoRepository favoritoRepository;
+    @Autowired private PreguntaRepository preguntaRepository;
+    @Autowired private PedidoRepository pedidoRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private BCryptPasswordEncoder passwordEncoder;
     @Autowired private S3Service s3Service;
@@ -52,7 +58,7 @@ public class UserController {
     }
     private String nvl(String s) { return s != null ? s : ""; }
 
-    // ──────────── PERFIL PROPIO ────────────
+    // ──────────── PERFIL ────────────
     @GetMapping("/perfil")
     public ResponseEntity<?> obtenerPerfil() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -60,7 +66,6 @@ public class UserController {
         return ResponseEntity.ok(buildPerfil(user, true));
     }
 
-    // ──────────── PERFIL PÚBLICO ────────────
     @GetMapping("/perfil/{username}")
     public ResponseEntity<?> perfilPublico(@PathVariable String username) {
         return userRepository.findByUsername(username)
@@ -72,7 +77,6 @@ public class UserController {
     public ResponseEntity<?> actualizarPerfil(@RequestBody Map<String, String> datos) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username).orElseThrow();
-
         if (datos.containsKey("nombreMostrado")) user.setNombreMostrado(datos.get("nombreMostrado"));
         if (datos.containsKey("email"))          user.setEmail(datos.get("email"));
         if (datos.containsKey("descripcion"))    user.setDescripcion(datos.get("descripcion"));
@@ -83,7 +87,6 @@ public class UserController {
         if (datos.containsKey("instagram"))      user.setInstagram(datos.get("instagram"));
         if (datos.containsKey("twitter"))        user.setTwitter(datos.get("twitter"));
         if (datos.containsKey("linkedin"))       user.setLinkedin(datos.get("linkedin"));
-
         userRepository.save(user);
         return ResponseEntity.ok("Perfil actualizado correctamente");
     }
@@ -96,7 +99,8 @@ public class UserController {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
             User user = userRepository.findByUsername(username).orElseThrow();
-            if (user.getFotoUrl() != null && !user.getFotoUrl().isEmpty()) s3Service.eliminarImagen(user.getFotoUrl());
+            if (user.getFotoUrl() != null && !user.getFotoUrl().isEmpty())
+                s3Service.eliminarImagen(user.getFotoUrl());
             String url = s3Service.subirImagenPerfil(archivo, username);
             user.setFotoUrl(url);
             userRepository.save(user);
@@ -121,7 +125,8 @@ public class UserController {
     public ResponseEntity<?> refrescarEstado() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username).orElseThrow();
-        return ResponseEntity.ok(new JwtResponse(jwtUtil.generateToken(user), user.getUsername(), user.getId(), user.getRole().toString()));
+        return ResponseEntity.ok(new JwtResponse(
+            jwtUtil.generateToken(user), user.getUsername(), user.getId(), user.getRole().toString()));
     }
 
     // ──────────── VENDEDOR ────────────
@@ -140,8 +145,9 @@ public class UserController {
     public ResponseEntity<?> verMiRol() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username).orElseThrow();
-        return ResponseEntity.ok(Map.of("username", user.getUsername(), "role", user.getRole().toString(),
-                "id", user.getId(), "habilitado", user.isHabilitado()));
+        return ResponseEntity.ok(Map.of(
+            "username", user.getUsername(), "role", user.getRole().toString(),
+            "id", user.getId(), "habilitado", user.isHabilitado()));
     }
 
     @PutMapping("/setup/hacer-admin/{id}")
@@ -169,7 +175,8 @@ public class UserController {
     public ResponseEntity<?> vendedores() {
         User admin = getAdmin();
         if (admin == null) return ResponseEntity.status(403).body("No tienes permisos");
-        return ResponseEntity.ok(userRepository.findAll().stream().filter(u -> u.getRole() == Role.SELLER)
+        return ResponseEntity.ok(userRepository.findAll().stream()
+                .filter(u -> u.getRole() == Role.SELLER)
                 .map(u -> Map.of("id", u.getId(), "username", u.getUsername(),
                         "nombreMostrado", nvl(u.getNombreMostrado()), "email", u.getEmail(),
                         "habilitado", u.isHabilitado(), "saldoDisponible", u.getSaldoDisponible()))
@@ -180,7 +187,8 @@ public class UserController {
     public ResponseEntity<?> todos() {
         User admin = getAdmin();
         if (admin == null) return ResponseEntity.status(403).body("No tienes permisos");
-        return ResponseEntity.ok(userRepository.findAll().stream().filter(u -> u.getRole() != Role.ADMIN)
+        return ResponseEntity.ok(userRepository.findAll().stream()
+                .filter(u -> u.getRole() != Role.ADMIN)
                 .map(u -> Map.of("id", u.getId(), "username", u.getUsername(),
                         "nombreMostrado", nvl(u.getNombreMostrado()), "email", u.getEmail(),
                         "role", u.getRole().toString(), "habilitado", u.isHabilitado(),
@@ -190,56 +198,97 @@ public class UserController {
 
     @PutMapping("/{id}/aprobar-vendedor")
     public ResponseEntity<?> aprobar(@PathVariable Long id) {
-        User admin = getAdmin(); if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
         User user = userRepository.findById(id).orElseThrow();
-        user.setRole(Role.SELLER); user.setSolicitudVendedor(false);
+        user.setRole(Role.SELLER);
+        user.setSolicitudVendedor(false);
         userRepository.save(user);
         return ResponseEntity.ok("Aprobado");
     }
 
     @PutMapping("/{id}/rechazar-vendedor")
     public ResponseEntity<?> rechazar(@PathVariable Long id) {
-        User admin = getAdmin(); if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
         User user = userRepository.findById(id).orElseThrow();
-        user.setSolicitudVendedor(false); userRepository.save(user);
+        user.setSolicitudVendedor(false);
+        userRepository.save(user);
         return ResponseEntity.ok("Rechazado");
     }
 
     @PutMapping("/{id}/toggle-habilitado")
     public ResponseEntity<?> toggle(@PathVariable Long id) {
-        User admin = getAdmin(); if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
         User user = userRepository.findById(id).orElseThrow();
-        user.setHabilitado(!user.isHabilitado()); userRepository.save(user);
+        user.setHabilitado(!user.isHabilitado());
+        userRepository.save(user);
         return ResponseEntity.ok(user.isHabilitado() ? "Habilitado" : "Deshabilitado");
     }
 
     @PutMapping("/{id}/habilitar")
     public ResponseEntity<?> habilitar(@PathVariable Long id) {
-        User admin = getAdmin(); if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
         User user = userRepository.findById(id).orElseThrow();
-        user.setHabilitado(true); userRepository.save(user); return ResponseEntity.ok("Habilitado");
+        user.setHabilitado(true);
+        userRepository.save(user);
+        return ResponseEntity.ok("Habilitado");
     }
 
     @PutMapping("/{id}/deshabilitar")
     public ResponseEntity<?> deshabilitar(@PathVariable Long id) {
-        User admin = getAdmin(); if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
         User user = userRepository.findById(id).orElseThrow();
-        user.setHabilitado(false); userRepository.save(user); return ResponseEntity.ok("Deshabilitado");
+        user.setHabilitado(false);
+        userRepository.save(user);
+        return ResponseEntity.ok("Deshabilitado");
     }
 
+    // ── ELIMINAR USUARIO — cascada completa ──
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
-        User admin = getAdmin(); if (admin == null) return ResponseEntity.status(403).body("No autorizado");
-        User user = userRepository.findById(id).orElseThrow();
-        var productos = productoRepository.findByVendedor_Id(id);
-        if (!productos.isEmpty()) productoRepository.deleteAll(productos);
-        userRepository.delete(user);
-        return ResponseEntity.ok("Usuario eliminado");
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null) return ResponseEntity.notFound().build();
+
+        try {
+            // 1. Productos del usuario y sus dependencias
+            var productos = productoRepository.findByVendedor_Id(id);
+            for (var prod : productos) {
+                favoritoRepository.deleteByProducto_Id(prod.getId());
+                preguntaRepository.deleteByProducto_Id(prod.getId());
+                pedidoRepository.deleteByProducto_Id(prod.getId());
+            }
+            if (!productos.isEmpty()) productoRepository.deleteAll(productos);
+
+            // 2. Favoritos que el usuario marcó en productos de otros
+            favoritoRepository.deleteByUsuario_Id(id);
+
+            // 3. Preguntas que el usuario hizo en productos de otros
+            preguntaRepository.deleteByUsuario_Id(id);
+
+            // 4. Pedidos donde el usuario fue comprador
+            pedidoRepository.deleteByCliente_Id(id);
+
+            // 5. Eliminar el usuario
+            userRepository.delete(user);
+
+            return ResponseEntity.ok("Usuario eliminado correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body("Error al eliminar usuario: " + e.getMessage());
+        }
     }
 
     private User getAdmin() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username)
-                .filter(u -> u.getRole() == Role.ADMIN).orElse(null);
+                .filter(u -> u.getRole() == Role.ADMIN)
+                .orElse(null);
     }
 }

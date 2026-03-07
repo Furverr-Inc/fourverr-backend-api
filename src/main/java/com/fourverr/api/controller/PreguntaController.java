@@ -2,6 +2,7 @@ package com.fourverr.api.controller;
 
 import com.fourverr.api.model.Pregunta;
 import com.fourverr.api.model.Producto;
+import com.fourverr.api.model.Role;
 import com.fourverr.api.model.User;
 import com.fourverr.api.repository.PreguntaRepository;
 import com.fourverr.api.repository.ProductoRepository;
@@ -24,18 +25,19 @@ public class PreguntaController {
     @Autowired private ProductoRepository productoRepository;
     @Autowired private UserRepository userRepository;
 
-    // GET /api/preguntas/producto/{id} — público
+    // GET público
     @GetMapping("/producto/{productoId}")
     public ResponseEntity<?> obtener(@PathVariable Long productoId) {
         return ResponseEntity.ok(preguntaRepository.findByProducto_IdOrderByFechaPreguntaAsc(productoId));
     }
 
-    // POST /api/preguntas/producto/{id} — usuario autenticado
+    // POST — usuario autenticado hace una pregunta
     @PostMapping("/producto/{productoId}")
     public ResponseEntity<?> preguntar(@PathVariable Long productoId,
                                        @RequestBody Map<String, String> body) {
         String texto = body.get("texto");
-        if (texto == null || texto.isBlank()) return ResponseEntity.badRequest().body("La pregunta no puede estar vacía");
+        if (texto == null || texto.isBlank())
+            return ResponseEntity.badRequest().body("La pregunta no puede estar vacía");
 
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User usuario = userRepository.findByUsername(username).orElseThrow();
@@ -48,12 +50,13 @@ public class PreguntaController {
         return ResponseEntity.ok(preguntaRepository.save(p));
     }
 
-    // PUT /api/preguntas/{id}/responder — solo el vendedor del producto
+    // PUT — solo el vendedor del producto puede responder
     @PutMapping("/{preguntaId}/responder")
     public ResponseEntity<?> responder(@PathVariable Long preguntaId,
                                        @RequestBody Map<String, String> body) {
         String respuesta = body.get("respuesta");
-        if (respuesta == null || respuesta.isBlank()) return ResponseEntity.badRequest().body("La respuesta no puede estar vacía");
+        if (respuesta == null || respuesta.isBlank())
+            return ResponseEntity.badRequest().body("La respuesta no puede estar vacía");
 
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         Pregunta p = preguntaRepository.findById(preguntaId).orElseThrow();
@@ -66,5 +69,26 @@ public class PreguntaController {
         p.setRespondidoPor(vendedor);
         p.setFechaRespuesta(LocalDateTime.now());
         return ResponseEntity.ok(preguntaRepository.save(p));
+    }
+
+    // DELETE — el autor de la pregunta O el vendedor del producto pueden eliminarla
+    @DeleteMapping("/{preguntaId}")
+    public ResponseEntity<?> eliminarPregunta(@PathVariable Long preguntaId) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User solicitante = userRepository.findByUsername(username).orElseThrow();
+
+        Pregunta p = preguntaRepository.findById(preguntaId)
+                .orElse(null);
+        if (p == null) return ResponseEntity.notFound().build();
+
+        boolean esAutor   = p.getUsuario().getUsername().equals(username);
+        boolean esVendedor = p.getProducto().getVendedor().getUsername().equals(username);
+        boolean esAdmin   = solicitante.getRole() == Role.ADMIN;
+
+        if (!esAutor && !esVendedor && !esAdmin)
+            return ResponseEntity.status(403).body("No tienes permiso para eliminar esta pregunta");
+
+        preguntaRepository.delete(p);
+        return ResponseEntity.ok().build();
     }
 }
