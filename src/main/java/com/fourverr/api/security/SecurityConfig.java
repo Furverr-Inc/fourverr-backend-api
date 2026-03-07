@@ -35,24 +35,19 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-
         http
             .csrf(csrf -> csrf.disable())
             .cors(Customizer.withDefaults())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
             .authorizeHttpRequests(auth -> auth
-                // Rutas públicas
                 .requestMatchers("/api/auth/**").permitAll()
+                // Contacto público (visitantes sin cuenta)
+                .requestMatchers(HttpMethod.POST, "/api/soporte/contacto").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()
-                // Todas las demás rutas autenticadas — sin restricción de roles
                 .anyRequest().authenticated()
             )
-
-            // DESACTIVAR el chequeo de cuenta habilitada en el provider
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
-
         return http.build();
     }
 
@@ -63,24 +58,19 @@ public class SecurityConfig {
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
-
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
         provider.setUserDetailsService(userDetailsService);
         provider.setPasswordEncoder(passwordEncoder());
-        // Desactiva el chequeo de isEnabled() en el provider
-        // para que el control de habilitado lo maneje solo el login
         provider.setPreAuthenticationChecks(userDetails -> {});
         return provider;
     }
