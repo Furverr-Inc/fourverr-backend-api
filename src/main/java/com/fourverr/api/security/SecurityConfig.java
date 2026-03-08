@@ -44,6 +44,7 @@ public class SecurityConfig {
                 // Contacto público (visitantes sin cuenta)
                 .requestMatchers(HttpMethod.POST, "/api/soporte/contacto").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/resenas/producto/**").permitAll()
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
