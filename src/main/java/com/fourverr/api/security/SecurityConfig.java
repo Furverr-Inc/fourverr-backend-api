@@ -40,7 +40,7 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/ping","/api/auth/**").permitAll()
                 // Contacto público (visitantes sin cuenta)
                 .requestMatchers(HttpMethod.POST, "/api/soporte/contacto").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()
