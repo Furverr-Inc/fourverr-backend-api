@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,7 +31,7 @@ public class UserController {
     @Autowired private PreguntaRepository preguntaRepository;
     @Autowired private PedidoRepository pedidoRepository;
     @Autowired private JwtUtil jwtUtil;
-    @Autowired private BCryptPasswordEncoder passwordEncoder;
+    @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private S3Service s3Service;
 
     // ──────────── HELPER ────────────
