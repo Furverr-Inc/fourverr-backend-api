@@ -37,14 +37,16 @@ public class S3Service {
 
     // metodo IMAGEN PERFIL ---USUSARIO---
     public String subirImagenPerfil(MultipartFile archivo, String username) {
-        String fileName = "perfiles/" + username + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
+        String clearName = archivo.getOriginalFilename().trim().replaceAll("\\s+", "_");
+        String fileName = "perfiles/" + username + "/" + UUID.randomUUID().toString() + "_" + clearName;
         return enviarAS3(archivo, fileName);
     }
 
     // metodo PRODUCTOS ---VENDEDOR---
     public String subirImagenProducto(MultipartFile archivo, String username) {
         // Estructura: productos/nombreVendedor/uuid_nombre.jpg
-        String fileName = "productos/" + username + "/" + UUID.randomUUID().toString() + "_" + archivo.getOriginalFilename();
+        String clearName = archivo.getOriginalFilename().trim().replaceAll("\\s", "_");
+        String fileName = "productos/" + username + "/" + UUID.randomUUID().toString() + "_" + clearName;
         return enviarAS3(archivo, fileName);
     }
 
