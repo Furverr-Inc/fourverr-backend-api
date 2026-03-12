@@ -2,6 +2,7 @@ package com.fourverr.api.controller;
 
 import com.fourverr.api.dto.JwtResponse;
 import com.fourverr.api.model.Role;
+import com.fourverr.api.model.SolicitudRetiro;
 import com.fourverr.api.model.User;
 import com.fourverr.api.repository.ChatMensajeRepository;
 import com.fourverr.api.repository.FavoritoRepository;
@@ -9,6 +10,7 @@ import com.fourverr.api.repository.PedidoRepository;
 import com.fourverr.api.repository.PreguntaRepository;
 import com.fourverr.api.repository.ProductoRepository;
 import com.fourverr.api.repository.ResenaRepository;
+import com.fourverr.api.repository.SolicitudRetiroRepository;
 import com.fourverr.api.repository.UserRepository;
 import com.fourverr.api.security.JwtUtil;
 import com.fourverr.api.service.S3Service;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,6 +37,7 @@ public class UserController {
     @Autowired private PedidoRepository pedidoRepository;
     @Autowired private ResenaRepository resenaRepository;
     @Autowired private ChatMensajeRepository chatMensajeRepository;
+    @Autowired private SolicitudRetiroRepository solicitudRetiroRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private S3Service s3Service;
@@ -145,6 +149,36 @@ public class UserController {
         return ResponseEntity.ok("Solicitud enviada.");
     }
 
+    @PostMapping("/solicitar-retiro")
+    public ResponseEntity<?> solicitarRetiro(@RequestBody Map<String, Object> datos) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username).orElseThrow();
+
+        if (user.getRole() != Role.SELLER)
+            return ResponseEntity.status(403).body("Solo vendedores pueden solicitar retiros");
+
+        BigDecimal monto = new BigDecimal(datos.get("monto").toString());
+
+        if (monto.compareTo(BigDecimal.ZERO) <= 0)
+            return ResponseEntity.badRequest().body("El monto debe ser mayor a 0");
+
+        if (monto.compareTo(user.getSaldoDisponible()) > 0)
+            return ResponseEntity.badRequest().body("Saldo insuficiente");
+
+        user.setSaldoDisponible(user.getSaldoDisponible().subtract(monto));
+        userRepository.save(user);
+
+        SolicitudRetiro solicitud = new SolicitudRetiro();
+        solicitud.setVendedor(user);
+        solicitud.setMonto(monto);
+        solicitudRetiroRepository.save(solicitud);
+
+        return ResponseEntity.ok(Map.of(
+            "mensaje", "Solicitud de retiro enviada por $" + monto + " MXN. Te contactaremos en 1-3 días hábiles.",
+            "saldoRestante", user.getSaldoDisponible()
+        ));
+    }
+
     // ──────────── ADMIN ────────────
     @GetMapping("/debug/mi-rol")
     public ResponseEntity<?> verMiRol() {
@@ -218,6 +252,39 @@ public class UserController {
                 .collect(Collectors.toList()));
     }
 
+    // ──────────── RETIROS (ADMIN) ────────────
+    @GetMapping("/retiros")
+    public ResponseEntity<?> verRetiros() {
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        return ResponseEntity.ok(solicitudRetiroRepository.findAllByOrderByFechaSolicitudDesc());
+    }
+
+    @PutMapping("/retiros/{id}/completar")
+    public ResponseEntity<?> completarRetiro(@PathVariable Long id) {
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        SolicitudRetiro s = solicitudRetiroRepository.findById(id).orElseThrow();
+        s.setEstado("COMPLETADO");
+        s.setFechaProcesado(LocalDateTime.now());
+        solicitudRetiroRepository.save(s);
+        return ResponseEntity.ok("Retiro marcado como completado");
+    }
+
+    @PutMapping("/retiros/{id}/rechazar")
+    public ResponseEntity<?> rechazarRetiro(@PathVariable Long id) {
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        SolicitudRetiro s = solicitudRetiroRepository.findById(id).orElseThrow();
+        User vendedor = s.getVendedor();
+        vendedor.setSaldoDisponible(vendedor.getSaldoDisponible().add(s.getMonto()));
+        userRepository.save(vendedor);
+        s.setEstado("RECHAZADO");
+        s.setFechaProcesado(LocalDateTime.now());
+        solicitudRetiroRepository.save(s);
+        return ResponseEntity.ok("Retiro rechazado y saldo devuelto");
+    }
+
     @PutMapping("/{id}/aprobar-vendedor")
     public ResponseEntity<?> aprobar(@PathVariable Long id) {
         User admin = getAdmin();
@@ -269,7 +336,6 @@ public class UserController {
         return ResponseEntity.ok("Deshabilitado");
     }
 
-    // ── ELIMINAR USUARIO — cascada completa ──
     @DeleteMapping("/{id}")
     public ResponseEntity<?> eliminar(@PathVariable Long id) {
         User admin = getAdmin();
@@ -279,69 +345,28 @@ public class UserController {
         if (user == null) return ResponseEntity.notFound().build();
 
         try {
-            // 1. Productos del vendedor y sus dependencias
             var productos = productoRepository.findByVendedor_Id(id);
             for (var prod : productos) {
-                // Reseñas del producto (antes que pedidos, porque reseña referencia pedido)
                 resenaRepository.deleteByProducto_Id(prod.getId());
-                // Dependencias del producto
                 favoritoRepository.deleteByProducto_Id(prod.getId());
                 preguntaRepository.deleteByProducto_Id(prod.getId());
                 pedidoRepository.deleteByProducto_Id(prod.getId());
             }
             if (!productos.isEmpty()) productoRepository.deleteAll(productos);
-
-            // 2. Reseñas que el usuario escribió como cliente
             resenaRepository.deleteByCliente_Id(id);
-
-            // 3. Favoritos que el usuario marcó en productos de otros
             favoritoRepository.deleteByUsuario_Id(id);
-
-            // 4. Preguntas que el usuario hizo en productos de otros
             preguntaRepository.deleteByUsuario_Id(id);
-
-            // 5. Pedidos donde el usuario fue comprador
-            //    (primero borrar reseñas que referencian esos pedidos — ya hecho en paso 2)
             pedidoRepository.deleteByCliente_Id(id);
-
-            // 6. Mensajes de chat del usuario
             chatMensajeRepository.deleteByRemitente_Id(id);
             chatMensajeRepository.deleteByDestinatario_Id(id);
-
-            // 7. Eliminar el usuario
             userRepository.delete(user);
-
             return ResponseEntity.ok("Usuario eliminado correctamente");
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                     .body("Error al eliminar usuario: " + e.getMessage());
         }
     }
-@PostMapping("/solicitar-retiro")
-public ResponseEntity<?> solicitarRetiro(@RequestBody Map<String, Object> datos) {
-    String username = SecurityContextHolder.getContext().getAuthentication().getName();
-    User user = userRepository.findByUsername(username).orElseThrow();
-    
-    if (user.getRole() != Role.SELLER)
-        return ResponseEntity.status(403).body("Solo vendedores pueden solicitar retiros");
-    
-    BigDecimal monto = new BigDecimal(datos.get("monto").toString());
-    
-    if (monto.compareTo(BigDecimal.ZERO) <= 0)
-        return ResponseEntity.badRequest().body("El monto debe ser mayor a 0");
-    
-    if (monto.compareTo(user.getSaldoDisponible()) > 0)
-        return ResponseEntity.badRequest().body("Saldo insuficiente");
-    
-    // Descontar el saldo
-    user.setSaldoDisponible(user.getSaldoDisponible().subtract(monto));
-    userRepository.save(user);
-    
-    return ResponseEntity.ok(Map.of(
-        "mensaje", "Solicitud de retiro enviada por $" + monto + " MXN. Te contactaremos en 1-3 días hábiles.",
-        "saldoRestante", user.getSaldoDisponible()
-    ));
-}
+
     private User getAdmin() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username)
