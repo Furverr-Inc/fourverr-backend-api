@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -316,7 +317,31 @@ public class UserController {
                     .body("Error al eliminar usuario: " + e.getMessage());
         }
     }
-
+@PostMapping("/solicitar-retiro")
+public ResponseEntity<?> solicitarRetiro(@RequestBody Map<String, Object> datos) {
+    String username = SecurityContextHolder.getContext().getAuthentication().getName();
+    User user = userRepository.findByUsername(username).orElseThrow();
+    
+    if (user.getRole() != Role.SELLER)
+        return ResponseEntity.status(403).body("Solo vendedores pueden solicitar retiros");
+    
+    BigDecimal monto = new BigDecimal(datos.get("monto").toString());
+    
+    if (monto.compareTo(BigDecimal.ZERO) <= 0)
+        return ResponseEntity.badRequest().body("El monto debe ser mayor a 0");
+    
+    if (monto.compareTo(user.getSaldoDisponible()) > 0)
+        return ResponseEntity.badRequest().body("Saldo insuficiente");
+    
+    // Descontar el saldo
+    user.setSaldoDisponible(user.getSaldoDisponible().subtract(monto));
+    userRepository.save(user);
+    
+    return ResponseEntity.ok(Map.of(
+        "mensaje", "Solicitud de retiro enviada por $" + monto + " MXN. Te contactaremos en 1-3 días hábiles.",
+        "saldoRestante", user.getSaldoDisponible()
+    ));
+}
     private User getAdmin() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username)
