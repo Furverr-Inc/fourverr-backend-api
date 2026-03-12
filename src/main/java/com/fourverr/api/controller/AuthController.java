@@ -50,6 +50,7 @@ public class AuthController {
         user.setEmail(request.getEmail());
         user.setNombreMostrado(request.getNombreMostrado());
         user.setRole(Role.USER); // Por defecto todos son USER al registrarse
+        user.setHabilitado(true); // Garantizar habilitado=true al registrarse
 
         userRepository.save(user);
         return ResponseEntity.ok("Usuario registrado exitosamente");
@@ -65,8 +66,10 @@ public class AuthController {
 
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        // 2. Obtener el usuario completo de la BD
-        User user = userRepository.findByUsernameOrEmail(loginRequest.getUsername(), loginRequest.getUsername())
+        // 2. Obtener el usuario por su USERNAME REAL (authentication.getName() siempre
+        //    devuelve el username, sin importar si el login fue con email o username)
+        String realUsername = authentication.getName();
+        User user = userRepository.findByUsername(realUsername)
                 .orElseThrow(() -> new RuntimeException("Error crítico: Usuario no encontrado después de autenticar."));
 
         // 3. Verificar si el usuario está habilitado
