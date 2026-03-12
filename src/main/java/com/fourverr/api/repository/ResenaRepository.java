@@ -4,6 +4,7 @@ import com.fourverr.api.model.Resena;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,4 +21,14 @@ public interface ResenaRepository extends JpaRepository<Resena, Long> {
     Double promedioCalificacion(Long productoId);
 
     long countByProducto_Id(Long productoId);
+
+    // ── Cascade delete ──
+    @Transactional
+    void deleteByProducto_Id(Long productoId);
+
+    @Transactional
+    void deleteByCliente_Id(Long clienteId);
+
+    @Transactional
+    void deleteByPedido_Id(Long pedidoId);
 }

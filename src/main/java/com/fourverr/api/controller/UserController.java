@@ -3,17 +3,18 @@ package com.fourverr.api.controller;
 import com.fourverr.api.dto.JwtResponse;
 import com.fourverr.api.model.Role;
 import com.fourverr.api.model.User;
+import com.fourverr.api.repository.ChatMensajeRepository;
 import com.fourverr.api.repository.FavoritoRepository;
 import com.fourverr.api.repository.PedidoRepository;
 import com.fourverr.api.repository.PreguntaRepository;
 import com.fourverr.api.repository.ProductoRepository;
+import com.fourverr.api.repository.ResenaRepository;
 import com.fourverr.api.repository.UserRepository;
 import com.fourverr.api.security.JwtUtil;
 import com.fourverr.api.service.S3Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +31,8 @@ public class UserController {
     @Autowired private FavoritoRepository favoritoRepository;
     @Autowired private PreguntaRepository preguntaRepository;
     @Autowired private PedidoRepository pedidoRepository;
+    @Autowired private ResenaRepository resenaRepository;
+    @Autowired private ChatMensajeRepository chatMensajeRepository;
     @Autowired private JwtUtil jwtUtil;
     @Autowired private PasswordEncoder passwordEncoder;
     @Autowired private S3Service s3Service;
@@ -190,10 +193,27 @@ public class UserController {
         if (admin == null) return ResponseEntity.status(403).body("No tienes permisos");
         return ResponseEntity.ok(userRepository.findAll().stream()
                 .filter(u -> u.getRole() != Role.ADMIN)
-                .map(u -> Map.of("id", u.getId(), "username", u.getUsername(),
-                        "nombreMostrado", nvl(u.getNombreMostrado()), "email", u.getEmail(),
-                        "role", u.getRole().toString(), "habilitado", u.isHabilitado(),
-                        "fotoUrl", nvl(u.getFotoUrl())))
+                .map(u -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id",             u.getId());
+                    m.put("username",       u.getUsername());
+                    m.put("nombreMostrado", nvl(u.getNombreMostrado()));
+                    m.put("email",          u.getEmail());
+                    m.put("role",           u.getRole().toString());
+                    m.put("habilitado",     u.isHabilitado());
+                    m.put("fotoUrl",        nvl(u.getFotoUrl()));
+                    m.put("descripcion",    nvl(u.getDescripcion()));
+                    m.put("telefono",       nvl(u.getTelefono()));
+                    m.put("ciudad",         nvl(u.getCiudad()));
+                    m.put("pais",           nvl(u.getPais()));
+                    m.put("sitioWeb",       nvl(u.getSitioWeb()));
+                    m.put("instagram",      nvl(u.getInstagram()));
+                    m.put("twitter",        nvl(u.getTwitter()));
+                    m.put("linkedin",       nvl(u.getLinkedin()));
+                    m.put("saldoDisponible",u.getSaldoDisponible());
+                    m.put("solicitudVendedor", u.isSolicitudVendedor());
+                    return m;
+                })
                 .collect(Collectors.toList()));
     }
 
@@ -258,25 +278,36 @@ public class UserController {
         if (user == null) return ResponseEntity.notFound().build();
 
         try {
-            // 1. Productos del usuario y sus dependencias
+            // 1. Productos del vendedor y sus dependencias
             var productos = productoRepository.findByVendedor_Id(id);
             for (var prod : productos) {
+                // Reseñas del producto (antes que pedidos, porque reseña referencia pedido)
+                resenaRepository.deleteByProducto_Id(prod.getId());
+                // Dependencias del producto
                 favoritoRepository.deleteByProducto_Id(prod.getId());
                 preguntaRepository.deleteByProducto_Id(prod.getId());
                 pedidoRepository.deleteByProducto_Id(prod.getId());
             }
             if (!productos.isEmpty()) productoRepository.deleteAll(productos);
 
-            // 2. Favoritos que el usuario marcó en productos de otros
+            // 2. Reseñas que el usuario escribió como cliente
+            resenaRepository.deleteByCliente_Id(id);
+
+            // 3. Favoritos que el usuario marcó en productos de otros
             favoritoRepository.deleteByUsuario_Id(id);
 
-            // 3. Preguntas que el usuario hizo en productos de otros
+            // 4. Preguntas que el usuario hizo en productos de otros
             preguntaRepository.deleteByUsuario_Id(id);
 
-            // 4. Pedidos donde el usuario fue comprador
+            // 5. Pedidos donde el usuario fue comprador
+            //    (primero borrar reseñas que referencian esos pedidos — ya hecho en paso 2)
             pedidoRepository.deleteByCliente_Id(id);
 
-            // 5. Eliminar el usuario
+            // 6. Mensajes de chat del usuario
+            chatMensajeRepository.deleteByRemitente_Id(id);
+            chatMensajeRepository.deleteByDestinatario_Id(id);
+
+            // 7. Eliminar el usuario
             userRepository.delete(user);
 
             return ResponseEntity.ok("Usuario eliminado correctamente");

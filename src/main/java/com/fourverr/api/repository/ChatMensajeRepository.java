@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Repository
@@ -32,4 +33,11 @@ public interface ChatMensajeRepository extends JpaRepository<ChatMensaje, Long> 
            "OR (m.remitente.id = :yo AND m.destinatario.id = :otro)) " +
            "AND m.leido = false AND m.destinatario.id = :yo")
     List<ChatMensaje> findNoLeidosParaMi(@Param("yo") Long yo, @Param("otro") Long otro);
+
+    // ── Cascade delete ──
+    @Transactional
+    void deleteByRemitente_Id(Long userId);
+
+    @Transactional
+    void deleteByDestinatario_Id(Long userId);
 }
