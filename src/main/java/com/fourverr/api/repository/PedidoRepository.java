@@ -8,8 +8,13 @@ import java.util.List;
 
 @Repository
 public interface PedidoRepository extends JpaRepository<Pedido, Long> {
+
     List<Pedido> findByCliente_Username(String username);
     List<Pedido> findByProducto_Vendedor_Username(String username);
+
+    // Necesarios para cascade delete (buscar antes de borrar mensajes)
+    List<Pedido> findByProducto_Id(Long productoId);
+    List<Pedido> findByCliente_Id(Long clienteId);
 
     @Transactional
     void deleteByProducto_Id(Long productoId);

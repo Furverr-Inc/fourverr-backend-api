@@ -45,9 +45,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/soporte/contacto").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resenas/producto/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/users/perfil/**").permitAll()
+                // Reportes admin
                 .requestMatchers("/api/reportes/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/reportes").authenticated()
                 .requestMatchers("/api/reportes/**").hasRole("ADMIN")
+                // Chat de compras (comprador y vendedor)
+                .requestMatchers("/api/pedidos/*/mensajes/**").authenticated()
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
@@ -58,7 +62,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173","https://furverr-inc.github.io"));
+        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
