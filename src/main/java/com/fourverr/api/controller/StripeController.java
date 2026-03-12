@@ -13,7 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/stripe")
-@CrossOrigin(origins = "http://localhost:5173")
+
 public class StripeController {
 
     @Autowired private StripeService stripeService;

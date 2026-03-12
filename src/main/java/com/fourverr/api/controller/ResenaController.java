@@ -12,7 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/resenas")
-@CrossOrigin(origins = "http://localhost:5173")
+
 public class ResenaController {
 
     @Autowired private ResenaRepository resenaRepository;

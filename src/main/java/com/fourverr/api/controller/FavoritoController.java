@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/favoritos")
-@CrossOrigin(origins = "http://localhost:5173")
+
 public class FavoritoController {
 
     @Autowired private FavoritoRepository favoritoRepository;

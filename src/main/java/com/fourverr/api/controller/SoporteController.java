@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/soporte")
-@CrossOrigin(origins = "http://localhost:5173")
+
 public class SoporteController {
 
     @Autowired private ChatMensajeRepository chatRepo;
