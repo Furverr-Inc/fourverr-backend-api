@@ -323,6 +323,58 @@ public class UserController {
         }
     }
 
+    // ── ELIMINAR MI PROPIA CUENTA ──
+    @Transactional
+    @DeleteMapping("/perfil/eliminar-cuenta")
+    public ResponseEntity<?> eliminarMiCuenta() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null) return ResponseEntity.status(404).body("Usuario no encontrado");
+
+        Long id = user.getId();
+        try {
+            // 1. Productos del usuario y sus dependencias
+            var productos = productoRepository.findByVendedor_Id(id);
+            for (var prod : productos) {
+                resenaRepository.deleteByProducto_Id(prod.getId());
+                reporteRepository.deleteByProducto_Id(prod.getId());
+                var pedidosProd = pedidoRepository.findByProducto_Id(prod.getId());
+                for (var p : pedidosProd) mensajeCompraRepository.deleteByPedido_Id(p.getId());
+                favoritoRepository.deleteByProducto_Id(prod.getId());
+                preguntaRepository.deleteByProducto_Id(prod.getId());
+                pedidoRepository.deleteByProducto_Id(prod.getId());
+            }
+            if (!productos.isEmpty()) productoRepository.deleteAll(productos);
+
+            // 2. Compras como cliente
+            var pedidosCliente = pedidoRepository.findByCliente_Id(id);
+            for (var p : pedidosCliente) mensajeCompraRepository.deleteByPedido_Id(p.getId());
+            resenaRepository.deleteByCliente_Id(id);
+            favoritoRepository.deleteByUsuario_Id(id);
+            preguntaRepository.deleteByUsuario_Id(id);
+            pedidoRepository.deleteByCliente_Id(id);
+
+            // 3. Chat soporte y reportes
+            chatMensajeRepository.deleteByRemitente_Id(id);
+            chatMensajeRepository.deleteByDestinatario_Id(id);
+            reporteRepository.deleteByReportante_Id(id);
+            reporteRepository.deleteByVendedor_Id(id);
+            mensajeCompraRepository.deleteByRemitente_Id(id);
+
+            // 4. Foto de perfil en S3
+            if (user.getFotoUrl() != null && !user.getFotoUrl().isBlank()) {
+                try { s3Service.eliminarImagen(user.getFotoUrl()); } catch (Exception ignored) {}
+            }
+
+            // 5. Eliminar usuario
+            userRepository.delete(user);
+            return ResponseEntity.ok("Cuenta eliminada correctamente");
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body("Error al eliminar cuenta: " + e.getMessage());
+        }
+    }
+
     private User getAdmin() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return userRepository.findByUsername(username)
