@@ -41,15 +41,15 @@ public class ProductoController {
         boolean tieneQ = q != null && !q.isBlank();
         boolean tieneTipo = tipo != null && !tipo.isBlank();
         if (tieneQ && tieneTipo) {
-            try { return productoRepository.buscarPorTextoYTipo(q, TipoProducto.valueOf(tipo)); }
-            catch (IllegalArgumentException e) { return productoRepository.buscarPorTexto(q); }
+            try { return productoRepository.buscarPorTextoYTipoActivos(q, TipoProducto.valueOf(tipo)); }
+            catch (IllegalArgumentException e) { return productoRepository.buscarPorTextoActivos(q); }
         }
-        if (tieneQ) return productoRepository.buscarPorTexto(q);
+        if (tieneQ) return productoRepository.buscarPorTextoActivos(q);
         if (tieneTipo) {
-            try { return productoRepository.findByTipo(TipoProducto.valueOf(tipo)); }
-            catch (IllegalArgumentException e) { return productoRepository.findAll(); }
+            try { return productoRepository.findByTipoAndActivoTrue(TipoProducto.valueOf(tipo)); }
+            catch (IllegalArgumentException e) { return productoRepository.findByActivoTrue(); }
         }
-        return productoRepository.findAll();
+        return productoRepository.findByActivoTrue();
     }
 
     @GetMapping("/mis-publicaciones")

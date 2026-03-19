@@ -36,4 +36,14 @@ public class StripeService {
 
         return PaymentIntent.create(params);
     }
+
+    /** Recupera un PaymentIntent de Stripe y verifica que esté realmente pagado */
+    public boolean verificarPago(String paymentIntentId) {
+        try {
+            PaymentIntent intent = PaymentIntent.retrieve(paymentIntentId);
+            return "succeeded".equals(intent.getStatus());
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

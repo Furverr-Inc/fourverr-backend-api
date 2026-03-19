@@ -6,6 +6,7 @@ import com.fourverr.api.model.User;
 import com.fourverr.api.repository.PedidoRepository;
 import com.fourverr.api.repository.ProductoRepository;
 import com.fourverr.api.repository.UserRepository;
+import com.fourverr.api.service.StripeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +25,7 @@ public class PedidoController {
     @Autowired private PedidoRepository pedidoRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ProductoRepository productoRepository;
+    @Autowired private StripeService stripeService;
 
     @PostMapping
     public ResponseEntity<?> crearPedido(@RequestBody Map<String, Object> datos) {
@@ -50,6 +52,10 @@ public class PedidoController {
             pedido.setCantidad(cantidad);
 
             if (stripeId != null) {
+                // Verificar con Stripe que el pago realmente se completó
+                if (!stripeService.verificarPago(stripeId)) {
+                    return ResponseEntity.badRequest().body("El pago no pudo ser verificado con Stripe");
+                }
                 pedido.setEstado("PAGADO");
                 User vendedor = producto.getVendedor();
                 vendedor.setSaldoDisponible(vendedor.getSaldoDisponible().add(montoVendedor));
