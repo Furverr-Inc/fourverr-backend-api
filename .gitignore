@@ -5,7 +5,7 @@ target/
 *.iml
 .vscode/
 .DS_Store
-
+*.code-workspace
 # SEGURIDAD: Ignoramos el archivo con las claves reales
 src/main/resources/application.properties
 
