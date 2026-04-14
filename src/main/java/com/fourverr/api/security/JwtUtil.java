@@ -52,6 +52,23 @@ public class JwtUtil {
         return extractClaim(token, Claims::getSubject);
     }
 
+    /**
+     * ID del usuario en el claim {@code userId} (tokens emitidos tras login).
+     * Puede ser null en tokens antiguos que no incluyan el claim.
+     */
+    public Long extractUserId(String token) {
+        try {
+            Object v = extractClaim(token, c -> c.get("userId"));
+            if (v == null) return null;
+            if (v instanceof Long) return (Long) v;
+            if (v instanceof Integer) return ((Integer) v).longValue();
+            if (v instanceof Number) return ((Number) v).longValue();
+            return Long.parseLong(v.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }

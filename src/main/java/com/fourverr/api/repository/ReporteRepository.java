@@ -13,6 +13,10 @@ public interface ReporteRepository extends JpaRepository<Reporte, Long> {
     List<Reporte> findAllByOrderByFechaReporteDesc();
     List<Reporte> findByVendedor_IdOrderByFechaReporteDesc(Long vendedorId);
     List<Reporte> findByEstadoOrderByFechaReporteDesc(Reporte.EstadoReporte estado);
+
+    /** Reportes creados por el usuario (panel "mis reportes" en el front). */
+    List<Reporte> findByReportante_IdOrderByFechaReporteDesc(Long reportanteId);
+
     boolean existsByReportante_IdAndProducto_Id(Long reportanteId, Long productoId);
 
     @Transactional
