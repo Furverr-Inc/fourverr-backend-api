@@ -46,7 +46,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/resenas/producto/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/users/perfil/**").permitAll()
-                // Reportes admin
+                // Reportes: el usuario ve los propios; el resto de /reportes/* es admin
+                .requestMatchers(HttpMethod.GET, "/api/reportes/mis-reportes").authenticated()
                 .requestMatchers("/api/reportes/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/reportes").authenticated()
                 .requestMatchers("/api/reportes/**").hasRole("ADMIN")
