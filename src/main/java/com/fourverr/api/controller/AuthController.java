@@ -42,8 +42,11 @@ public class AuthController {
         }
         
         // Verificar si el correo ya existe (Validación extra recomendada)
-        // if (userRepository.existsByEmail(request.getEmail())) { ... }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Este correo ya existe");
+        }
 
+        
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
