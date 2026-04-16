@@ -45,6 +45,11 @@ public class PedidoController {
             User cliente = userRepository.findByUsername(usernameActual).orElseThrow();
             Producto producto = productoRepository.findById(idProducto).orElseThrow();
 
+            if (producto.getVendedor() != null
+                    && producto.getVendedor().getId().equals(cliente.getId())) {
+                return ResponseEntity.badRequest().body("No puedes comprar tu propio producto.");
+            }
+
             if (producto.getTipo() == TipoProducto.PRODUCTO_FISICO) {
                 String envioErr = validarDatosEnvioFisico(requisitos);
                 if (envioErr != null) {
