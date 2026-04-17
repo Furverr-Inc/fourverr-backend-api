@@ -119,9 +119,28 @@ public class UserController {
     public ResponseEntity<?> cambiarPassword(@RequestBody Map<String, String> datos) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByUsername(username).orElseThrow();
-        if (!passwordEncoder.matches(datos.get("passwordActual"), user.getPassword()))
-            return ResponseEntity.badRequest().body("La contraseña actual es incorrecta");
-        user.setPassword(passwordEncoder.encode(datos.get("passwordNueva")));
+
+        String usernameIngresado = datos.get("username");
+        String emailIngresado    = datos.get("email");
+        String passwordNueva     = datos.get("passwordNueva");
+
+        if (usernameIngresado == null || emailIngresado == null || passwordNueva == null
+                || usernameIngresado.isBlank() || emailIngresado.isBlank() || passwordNueva.isBlank())
+            return ResponseEntity.badRequest().body("Completa todos los campos");
+
+        if (!user.getUsername().equalsIgnoreCase(usernameIngresado.trim()))
+            return ResponseEntity.badRequest().body("El nombre de usuario no coincide con tu cuenta");
+
+        if (user.getEmail() == null || !user.getEmail().equalsIgnoreCase(emailIngresado.trim()))
+            return ResponseEntity.badRequest().body("El correo no coincide con tu cuenta");
+
+        if (!passwordNueva.matches("^(?=.*[A-Za-z])(?=.*\\d).{8,}$"))
+            return ResponseEntity.badRequest().body("La nueva contraseña debe tener mínimo 8 caracteres, con al menos 1 letra y 1 número");
+
+        if (passwordEncoder.matches(passwordNueva, user.getPassword()))
+            return ResponseEntity.badRequest().body("La nueva contraseña debe ser distinta a la actual");
+
+        user.setPassword(passwordEncoder.encode(passwordNueva));
         userRepository.save(user);
         return ResponseEntity.ok("Contraseña actualizada");
     }
