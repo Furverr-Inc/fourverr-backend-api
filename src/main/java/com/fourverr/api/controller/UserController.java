@@ -58,6 +58,7 @@ public class UserController {
             map.put("telefono",          nvl(user.getTelefono()));
             map.put("solicitudVendedor", user.isSolicitudVendedor());
             map.put("saldoDisponible",   user.getSaldoDisponible());
+            map.put("stripeAccountId",   user.getStripeAccountId() != null ? user.getStripeAccountId() : "");
         }
         return map;
     }

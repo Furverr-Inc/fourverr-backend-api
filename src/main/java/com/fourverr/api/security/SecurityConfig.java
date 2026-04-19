@@ -41,6 +41,8 @@ public class SecurityConfig {
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                // Health-check público para UptimeRobot / Render keep-alive
+                .requestMatchers(HttpMethod.GET, "/ping").permitAll()
                 // Contacto público (visitantes sin cuenta)
                 .requestMatchers(HttpMethod.POST, "/api/soporte/contacto").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/productos").permitAll()

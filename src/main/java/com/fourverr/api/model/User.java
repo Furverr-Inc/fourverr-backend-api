@@ -45,6 +45,12 @@ public class User {
     @Column(name = "habilitado")
     private Boolean habilitado = true;
 
+    // ===== STRIPE CONNECT =====
+    /** ID de la cuenta conectada de Stripe (ej: acct_1ABC...).
+     *  Se guarda cuando el vendedor completa el onboarding de Stripe Connect. */
+    @Column(name = "stripe_account_id", length = 50)
+    private String stripeAccountId;
+
     // ===== CAMPOS DE CONTACTO =====
     @Column(name = "telefono", length = 20)
     private String telefono;
