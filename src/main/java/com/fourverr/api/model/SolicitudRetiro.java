@@ -30,6 +30,10 @@ public class SolicitudRetiro {
     @Column(name = "fecha_procesado")
     private LocalDateTime fechaProcesado;
 
+    /** Snapshot de la CLABE del vendedor al momento de solicitar el retiro */
+    @Column(name = "clabe_snapshot", length = 18)
+    private String clabeSnapshot;
+
     @Column(length = 500)
     private String notas;
 }

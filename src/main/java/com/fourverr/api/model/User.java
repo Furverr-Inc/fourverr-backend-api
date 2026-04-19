@@ -51,6 +51,11 @@ public class User {
     @Column(name = "stripe_account_id", length = 50)
     private String stripeAccountId;
 
+    // ===== DATOS BANCARIOS (retiros) =====
+    /** CLABE interbancaria de 18 dígitos para recibir transferencias SPEI */
+    @Column(name = "clabe", length = 18)
+    private String clabe;
+
     // ===== CAMPOS DE CONTACTO =====
     @Column(name = "telefono", length = 20)
     private String telefono;

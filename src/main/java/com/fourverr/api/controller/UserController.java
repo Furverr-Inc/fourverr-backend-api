@@ -59,6 +59,7 @@ public class UserController {
             map.put("solicitudVendedor", user.isSolicitudVendedor());
             map.put("saldoDisponible",   user.getSaldoDisponible());
             map.put("stripeAccountId",   user.getStripeAccountId() != null ? user.getStripeAccountId() : "");
+            map.put("clabe",             nvl(user.getClabe()));
         }
         return map;
     }
@@ -87,6 +88,7 @@ public class UserController {
         if (datos.containsKey("email"))          user.setEmail(datos.get("email"));
         if (datos.containsKey("descripcion"))    user.setDescripcion(datos.get("descripcion"));
         if (datos.containsKey("telefono"))       user.setTelefono(datos.get("telefono"));
+        if (datos.containsKey("clabe"))           user.setClabe(datos.get("clabe"));
         if (datos.containsKey("ciudad"))         user.setCiudad(datos.get("ciudad"));
         if (datos.containsKey("pais"))           user.setPais(datos.get("pais"));
         if (datos.containsKey("sitioWeb"))       user.setSitioWeb(datos.get("sitioWeb"));
@@ -167,6 +169,10 @@ public class UserController {
         if (vendedor.getRole() != Role.SELLER && vendedor.getRole() != Role.ADMIN)
             return ResponseEntity.status(403).body("Solo los vendedores pueden solicitar retiros");
 
+        // Validar que el vendedor tenga CLABE registrada
+        if (vendedor.getClabe() == null || vendedor.getClabe().isBlank())
+            return ResponseEntity.badRequest().body("Debes registrar tu CLABE bancaria antes de solicitar un retiro. Ve a Editar Perfil.");
+
         BigDecimal monto;
         try {
             monto = new BigDecimal(body.get("monto").toString());
@@ -188,6 +194,7 @@ public class UserController {
         solicitud.setVendedor(vendedor);
         solicitud.setMonto(monto);
         solicitud.setEstado("PENDIENTE");
+        solicitud.setClabeSnapshot(vendedor.getClabe());
         solicitud.setNotas(body.containsKey("notas") ? body.get("notas").toString() : null);
 
         return ResponseEntity.ok(solicitudRetiroRepository.save(solicitud));
