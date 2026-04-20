@@ -61,8 +61,9 @@ public class StripeService {
      * @param stripeAccountId ID de la cuenta conectada del vendedor (acct_...)
      */
     public PaymentIntent crearPaymentIntentConnect(BigDecimal precio, String currency, String stripeAccountId) throws Exception {
-        long montoTotal     = precio.multiply(BigDecimal.valueOf(100)).longValue();
-        long comisionPlat   = precio.multiply(BigDecimal.valueOf(10)).longValue(); // 10% en centavos
+        long montoTotal   = precio.multiply(BigDecimal.valueOf(100)).longValue();
+        // 10% de la comisión de la plataforma en la misma unidad que amount (centavos / minor units)
+        long comisionPlat = montoTotal / 10;
 
         PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
                 .setAmount(montoTotal)
