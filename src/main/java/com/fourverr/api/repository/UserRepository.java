@@ -14,8 +14,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     // Busca si coincide con el username O si coincide con el email
     Optional<User> findByUsernameOrEmail(String username, String email);
 
+    Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
 
-    boolean existsByUsername(String username); 
+    boolean existsByUsername(String username);
 }

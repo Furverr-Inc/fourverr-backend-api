@@ -17,7 +17,10 @@ import java.util.UUID;
 import java.util.Collections;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -32,6 +35,8 @@ import org.springframework.web.bind.annotation.*;
 
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
     @Autowired
     private AuthenticationManager authenticationManager;
 
@@ -43,6 +48,9 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Value("${google.client.id:464885428939-7kpa14pougj5jshat56iiq6ak48qulu0.apps.googleusercontent.com}")
+    private String googleClientId;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -72,56 +80,73 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<?> googleLogin(@RequestBody Map<String, String> body) {
-        try {
-            // 1. Recibimos el token que envía el Frontend
-            String idTokenString = body.get("token");
-            
-            // 2. Validamos el token con la librería de Google
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
-                    .setAudience(Collections.singletonList("464885428939-7kpa14pougj5jshat56iiq6ak48qulu0.apps.googleusercontent.com"))
-                    .build();
-
-            GoogleIdToken idToken = verifier.verify(idTokenString);
-            
-            if (idToken != null) {
-                Payload payload = idToken.getPayload();
-                String email = payload.getEmail();
-                
-                // 3. Buscamos si el usuario ya existe por email
-                User user = userRepository.findByUsernameOrEmail(email, email)
-                    .orElseGet(() -> {
-                        // Si no existe, creamos uno nuevo automáticamente
-                        User nuevo = new User();
-                        nuevo.setEmail(email);
-                        nuevo.setUsername(email); // Usamos el email como username inicial
-                        nuevo.setNombreMostrado((String) payload.get("name"));
-                        nuevo.setFotoUrl((String) payload.get("picture"));
-                        nuevo.setPassword(passwordEncoder.encode(UUID.randomUUID().toString())); // Password aleatorio
-                        nuevo.setRole(Role.USER);
-                        nuevo.setHabilitado(true);
-                        return userRepository.save(nuevo);
-                    });
-
-                // 4. Verificamos si está habilitado (igual que en tu login actual)
-                if (!user.isHabilitado()) {
-                    return ResponseEntity.status(403).body("Cuenta deshabilitada.");
-                }
-
-                // 5. Generamos TU token JWT de Furverr
-                String jwt = jwtUtil.generateToken(user);
-
-                return ResponseEntity.ok(new JwtResponse(
-                    jwt, user.getUsername(), user.getId(), user.getRole().toString(),
-                    user.getNombreMostrado(), user.getFotoUrl()
-                ));
-            } 
-            else {
-                return ResponseEntity.status(401).body("Token de Google inválido");
-            }
-        } 
-        catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error: " + e.getMessage());
+        String idTokenString = body == null ? null : body.get("token");
+        if (idTokenString == null || idTokenString.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Falta el token de Google");
         }
+
+        GoogleIdToken idToken;
+        try {
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), new GsonFactory())
+                    .setAudience(Collections.singletonList(googleClientId))
+                    .build();
+            idToken = verifier.verify(idTokenString);
+        } catch (Exception e) {
+            log.warn("Fallo al verificar token de Google: {}", e.toString());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token de Google inválido");
+        }
+
+        if (idToken == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token de Google inválido");
+        }
+
+        try {
+            Payload payload = idToken.getPayload();
+            String email = payload.getEmail();
+            if (email == null || email.isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El token de Google no contiene email");
+            }
+
+            User user = userRepository.findByEmail(email)
+                .or(() -> userRepository.findByUsername(email))
+                .orElseGet(() -> crearUsuarioDesdeGoogle(email, payload));
+
+            if (!user.isHabilitado()) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cuenta deshabilitada.");
+            }
+
+            String jwt = jwtUtil.generateToken(user);
+            return ResponseEntity.ok(new JwtResponse(
+                jwt, user.getUsername(), user.getId(), user.getRole().toString(),
+                user.getNombreMostrado() != null ? user.getNombreMostrado() : user.getUsername(),
+                user.getFotoUrl() != null ? user.getFotoUrl() : ""
+            ));
+        } catch (Exception e) {
+            log.error("Error procesando login de Google", e);
+            return ResponseEntity.internalServerError().body("No se pudo iniciar sesión con Google");
+        }
+    }
+
+    private User crearUsuarioDesdeGoogle(String email, Payload payload) {
+        User nuevo = new User();
+        nuevo.setEmail(email);
+        nuevo.setUsername(generarUsernameUnico(email));
+        nuevo.setNombreMostrado((String) payload.get("name"));
+        nuevo.setFotoUrl((String) payload.get("picture"));
+        nuevo.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+        nuevo.setRole(Role.USER);
+        nuevo.setHabilitado(true);
+        return userRepository.save(nuevo);
+    }
+
+    private String generarUsernameUnico(String email) {
+        String base = email;
+        if (!userRepository.existsByUsername(base)) return base;
+        for (int i = 1; i < 1000; i++) {
+            String candidato = base + "_" + i;
+            if (!userRepository.existsByUsername(candidato)) return candidato;
+        }
+        return base + "_" + UUID.randomUUID().toString().substring(0, 8);
     }
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
