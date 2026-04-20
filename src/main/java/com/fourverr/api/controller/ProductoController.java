@@ -12,6 +12,7 @@ import com.fourverr.api.repository.ResenaRepository;
 import com.fourverr.api.repository.UserRepository;
 import com.fourverr.api.service.S3Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -25,6 +26,9 @@ import java.util.List;
 @RequestMapping("/api/productos")
 
 public class ProductoController {
+
+    /** Alineado con el mínimo de cargo en Stripe (MXN) para que todo servicio sea comprable con tarjeta. */
+    private static final BigDecimal PRECIO_MINIMO_MXN = new BigDecimal("10.00");
 
     @Autowired private ProductoRepository productoRepository;
     @Autowired private UserRepository userRepository;
@@ -73,6 +77,10 @@ public class ProductoController {
         User vendedor = userRepository.findByUsername(auth.getName()).orElseThrow();
         if (vendedor.getRole() != Role.SELLER && vendedor.getRole() != Role.ADMIN)
             return ResponseEntity.status(403).body("Debes ser Vendedor para publicar");
+        if (precio == null || precio.compareTo(PRECIO_MINIMO_MXN) < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El precio mínimo para publicar un servicio es 10 MXN.");
+        }
         try {
             String urlArchivo = s3Service.subirImagenProducto(archivo, auth.getName());
             String urlPortada = (portada != null) ? s3Service.subirImagenProducto(portada, auth.getName()) : null;
@@ -103,6 +111,10 @@ public class ProductoController {
                 User req = userRepository.findByUsername(username).orElse(null);
                 if (req == null || req.getRole() != Role.ADMIN)
                     return ResponseEntity.status(403).body("No tienes permiso para editar esta publicación");
+            }
+            if (precio == null || precio.compareTo(PRECIO_MINIMO_MXN) < 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("El precio mínimo para publicar un servicio es 10 MXN.");
             }
             try {
                 prod.setTitulo(titulo); prod.setDescripcion(descripcion);
