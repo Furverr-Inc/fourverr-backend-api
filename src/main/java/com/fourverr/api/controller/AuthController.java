@@ -3,6 +3,7 @@ package com.fourverr.api.controller;
 import com.fourverr.api.dto.JwtResponse;
 import com.fourverr.api.dto.LoginRequest;
 import com.fourverr.api.dto.RegisterRequest;
+import com.fourverr.api.dto.ResetPasswordRequest;
 import com.fourverr.api.model.Role;
 import com.fourverr.api.model.User;
 import com.fourverr.api.repository.UserRepository;
@@ -148,6 +149,42 @@ public class AuthController {
         }
         return base + "_" + UUID.randomUUID().toString().substring(0, 8);
     }
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        if (request == null || request.getUsername() == null || request.getEmail() == null
+                || request.getNewPassword() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Faltan datos para restablecer la contraseña.");
+        }
+
+        String username = request.getUsername().trim();
+        String email    = request.getEmail().trim().toLowerCase();
+        String nueva    = request.getNewPassword();
+
+        if (username.isEmpty() || email.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El usuario y el correo son obligatorios.");
+        }
+        if (nueva == null || nueva.length() < 8 || !nueva.matches(".*[A-Za-z].*") || !nueva.matches(".*\\d.*")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("La nueva contraseña debe tener mínimo 8 caracteres, con al menos 1 letra y 1 número.");
+        }
+
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null || user.getEmail() == null
+                || !user.getEmail().trim().equalsIgnoreCase(email)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("El usuario y el correo no coinciden con ninguna cuenta registrada.");
+        }
+
+        if (!user.isHabilitado()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Tu cuenta está deshabilitada. Contacta al administrador.");
+        }
+
+        user.setPassword(passwordEncoder.encode(nueva));
+        userRepository.save(user);
+        return ResponseEntity.ok("Contraseña actualizada exitosamente.");
+    }
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         
