@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,6 +19,8 @@ import java.io.IOException;
 
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtRequestFilter.class);
 
     @Autowired
     private UserDetailsService userDetailsService;
@@ -49,31 +53,16 @@ public class JwtRequestFilter extends OncePerRequestFilter {
         String username = null;
         String jwt = null;
 
-        // Solo si hay Bearer
+        log.debug("Path solicitado: {} | Authorization: {}", path, authHeader != null ? "Presente" : "AUSENTE");
+
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-
             jwt = authHeader.substring(7);
-
             try {
                 username = jwtUtil.extractUsername(jwt);
+                log.debug("Usuario extraído del token: {}", username);
             } catch (Exception e) {
-                System.out.println("JWT inválido: " + e.getMessage());
+                log.warn("JWT inválido o error extrayendo username: {}", e.getMessage());
             }
-        }
-
-
-        System.out.println("Path solicitado: " + path);
-        System.out.println("Header Authorization: " + (authHeader != null ? "Presente" : "AUSENTE"));
-
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            jwt = authHeader.substring(7);
-            try {
-                username = jwtUtil.extractUsername(jwt);
-                System.out.println("Usuario extraído del Token: " + username);
-                } 
-            catch (Exception e) {
-                System.out.println("Error al extraer username: " + e.getMessage());
-                }
         }
 
         // Validar token solo si hay username

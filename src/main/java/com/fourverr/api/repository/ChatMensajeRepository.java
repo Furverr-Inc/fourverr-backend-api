@@ -2,6 +2,7 @@ package com.fourverr.api.repository;
 
 import com.fourverr.api.model.ChatMensaje;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -40,4 +41,12 @@ public interface ChatMensajeRepository extends JpaRepository<ChatMensaje, Long> 
 
     @Transactional
     void deleteByDestinatario_Id(Long userId);
+
+    // Borrar toda la conversación entre dos usuarios (bidireccional)
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM ChatMensaje m WHERE " +
+           "(m.remitente.id = :a AND m.destinatario.id = :b) OR " +
+           "(m.remitente.id = :b AND m.destinatario.id = :a)")
+    int deleteConversacion(@Param("a") Long a, @Param("b") Long b);
 }

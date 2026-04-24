@@ -41,10 +41,14 @@ public class MensajeCompraController {
         List<MensajeCompra> mensajes = mensajeCompraRepository
                 .findByPedido_IdOrderByFechaEnvioAsc(id);
 
-        // Marcar como leídos los mensajes del otro
-        mensajes.stream()
+        // Marcar como leídos los mensajes del otro en un solo saveAll
+        List<MensajeCompra> paraMarcar = mensajes.stream()
                 .filter(m -> !m.getRemitente().getId().equals(user.getId()) && !m.isLeido())
-                .forEach(m -> { m.setLeido(true); mensajeCompraRepository.save(m); });
+                .toList();
+        if (!paraMarcar.isEmpty()) {
+            paraMarcar.forEach(m -> m.setLeido(true));
+            mensajeCompraRepository.saveAll(paraMarcar);
+        }
 
         return ResponseEntity.ok(mensajes);
     }

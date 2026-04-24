@@ -132,10 +132,14 @@ public class SoporteController {
                 userIds.add(otherId);
             });
 
+        // Cargar todos los usuarios en una sola query y conservar el orden original
+        Map<Long, User> usuariosPorId = userRepo.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        long noLeidos = chatRepo.countByDestinatario_IdAndLeidoFalse(admin.getId());
+
         List<Map<String, Object>> resultado = userIds.stream().map(uid -> {
-            User u = userRepo.findById(uid).orElse(null);
+            User u = usuariosPorId.get(uid);
             if (u == null) return null;
-            long noLeidos = chatRepo.countByDestinatario_IdAndLeidoFalse(admin.getId());
             // último mensaje de esta conversación
             List<ChatMensaje> conv = chatRepo.findConversacion(admin.getId(), uid);
             String ultimoMensaje = conv.isEmpty() ? "" : conv.get(conv.size()-1).getTexto();
@@ -165,6 +169,17 @@ public class SoporteController {
         if (!noLeidos.isEmpty()) chatRepo.saveAll(noLeidos);
 
         return ResponseEntity.ok(chatRepo.findConversacion(admin.getId(), usuarioId));
+    }
+
+    /** Eliminar toda la conversación entre el admin y un usuario */
+    @DeleteMapping("/admin/chat/{usuarioId}")
+    public ResponseEntity<?> eliminarConversacion(@PathVariable Long usuarioId) {
+        User admin = getAdmin();
+        if (admin == null) return ResponseEntity.status(403).body("No autorizado");
+        if (!userRepo.existsById(usuarioId)) return ResponseEntity.notFound().build();
+
+        int eliminados = chatRepo.deleteConversacion(admin.getId(), usuarioId);
+        return ResponseEntity.ok(Map.of("eliminados", eliminados));
     }
 
     /** Lista de mensajes de contacto (visitantes) */

@@ -59,13 +59,13 @@ public class AuthController {
         if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("El nombre de usuario ya existe");
         }
-        
+
         // Verificar si el correo ya existe (Validación extra recomendada)
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Este correo ya existe");
         }
 
-        
+
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -187,7 +187,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
-        
+
         // 1. Autenticar credenciales con Spring Security
         // (Aquí Spring usa tu CustomUserDetailsService para checar user O email)
         Authentication authentication = authenticationManager.authenticate(
@@ -221,5 +221,5 @@ public class AuthController {
     }
 
 
-    
+
 }

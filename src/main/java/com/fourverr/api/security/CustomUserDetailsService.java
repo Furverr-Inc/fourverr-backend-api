@@ -19,11 +19,16 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByUsernameOrEmail(usernameOrEmail, usernameOrEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuario o correo no encontrado: " + usernameOrEmail));
 
-        // Constructor de 3 args: siempre enabled=true
-        // El control de habilitado/deshabilitado se maneja en el AuthController al hacer login
+        // enabled refleja el flag real del usuario para que Spring Security rechace
+        // automáticamente el acceso (vía DisabledException) cuando la cuenta está deshabilitada,
+        // tanto en login como en validación de JWT.
         return new org.springframework.security.core.userdetails.User(
                 user.getUsername(),
                 user.getPassword(),
+                user.isHabilitado(),
+                true,
+                true,
+                true,
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
         );
     }
